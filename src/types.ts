@@ -338,6 +338,8 @@ export interface KasbonRequest {
   accountHolderName?: string; // Nama pemilik rekening / Atas Nama
 }
 
+export type KasbonPlafondType = "percent" | "auto" | "fixed" | "unlimited";
+
 export interface UserProfile {
   uid: string;
   username: string;
@@ -353,6 +355,10 @@ export interface UserProfile {
   accountNumber?: string;
   accountHolderName?: string;
   createdAt?: string;
+  // Kasbon Plafond Configuration
+  kasbonPlafondType?: KasbonPlafondType; // "percent" | "auto" | "fixed" | "unlimited" (default is "percent")
+  kasbonPercentLimit?: number; // Persentase dari total THP bruto (Gaji + Reimbursement), default 50%
+  kasbonFixedLimit?: number; // Nominal tetap jika kasbonPlafondType === "fixed" (misal Rp 2.000.000)
 }
 
 export interface Kwitansi {

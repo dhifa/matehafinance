@@ -11,12 +11,13 @@ import {
   X,
   ShieldCheck
 } from "lucide-react";
-import { auth } from "../utils/firebase";
+import { auth, db } from "../utils/firebase";
 import { 
   updatePassword, 
   reauthenticateWithCredential, 
   EmailAuthProvider 
 } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
 import { UserProfile } from "../types";
 
 interface ChangePasswordModalProps {
@@ -99,6 +100,16 @@ export default function ChangePasswordModal({
 
       // 2. Update to new password in Firebase Auth
       await updatePassword(currentUser, newPassword);
+
+      // 3. Update password in Firestore database so Admin table stays in sync
+      try {
+        await updateDoc(doc(db, "users", currentUser.uid), {
+          password: newPassword,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (firestoreErr) {
+        console.warn("Could not sync password to users Firestore collection:", firestoreErr);
+      }
 
       onNotify("Kata sandi Anda berhasil diperbarui! Gunakan kata sandi baru untuk login selanjutnya.", "success");
       handleClose();

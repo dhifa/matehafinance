@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, addDoc } from "firebase/firestore";
 import { db, sanitizeForFirestore, registerTeamMemberByAdmin, syncUserAuthPassword } from "../utils/firebase";
-import { UserProfile, CustomRole, StaffRolePreset, formatRupiah, TabType } from "../types";
+import { UserProfile, CustomRole, StaffRolePreset, formatRupiah, TabType, KasbonPlafondType } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Users, 
@@ -197,6 +197,9 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
   const [editRoleInput, setEditRoleInput] = useState("");
   const [editStatusInput, setEditStatusInput] = useState<"aktif" | "nonaktif">("aktif");
   const [editAccessInput, setEditAccessInput] = useState("");
+  const [editKasbonPlafondType, setEditKasbonPlafondType] = useState<KasbonPlafondType>("percent");
+  const [editKasbonPercentLimit, setEditKasbonPercentLimit] = useState("50");
+  const [editKasbonFixedLimit, setEditKasbonFixedLimit] = useState("");
   const [savingUser, setSavingUser] = useState(false);
 
   // Add New Team Member modal state (Admin Exclusive)
@@ -211,6 +214,9 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
   const [addCustomEmail, setAddCustomEmail] = useState("");
   const [addUseCustomEmail, setAddUseCustomEmail] = useState(false);
   const [addAccessLevel, setAddAccessLevel] = useState("");
+  const [addKasbonPlafondType, setAddKasbonPlafondType] = useState<KasbonPlafondType>("percent");
+  const [addKasbonPercentLimit, setAddKasbonPercentLimit] = useState("50");
+  const [addKasbonFixedLimit, setAddKasbonFixedLimit] = useState("");
   const [creatingUser, setCreatingUser] = useState(false);
 
   // Self-contained confirmation modal state
@@ -465,6 +471,9 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
     setEditPasswordInput(user.password || "");
     setEditRoleInput(user.role || "staff");
     setEditStatusInput(user.status || "aktif");
+    setEditKasbonPlafondType(user.kasbonPlafondType || "percent");
+    setEditKasbonPercentLimit(user.kasbonPercentLimit !== undefined ? user.kasbonPercentLimit.toString() : "50");
+    setEditKasbonFixedLimit(user.kasbonFixedLimit !== undefined ? user.kasbonFixedLimit.toString() : "");
     setEditAccessInput(
       user.accessLevel ||
       (user.role === "admin"
@@ -482,13 +491,18 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
 
     setSavingUser(true);
     try {
+      const fixedLimitNum = Number(editKasbonFixedLimit.replace(/\D/g, "")) || 0;
+      const percentLimitNum = Number(editKasbonPercentLimit) || 50;
       const updateData: Partial<UserProfile> = {
         displayName: editDisplayNameInput.trim() || editingUser.username,
         jobTitle: editJobTitleInput.trim() || undefined,
         phone: editPhoneInput.trim() || undefined,
         role: editRoleInput,
         status: editStatusInput,
-        accessLevel: editAccessInput.trim()
+        accessLevel: editAccessInput.trim(),
+        kasbonPlafondType: editKasbonPlafondType,
+        kasbonPercentLimit: editKasbonPlafondType === "percent" ? percentLimitNum : undefined,
+        kasbonFixedLimit: editKasbonPlafondType === "fixed" ? fixedLimitNum : undefined
       };
       if (editPasswordInput.trim()) {
         updateData.password = editPasswordInput.trim();
@@ -565,6 +579,8 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
           : `Staff Lapangan (${roleName})`;
 
       const finalAccess = addAccessLevel.trim() || defaultAccess;
+      const addFixedNum = Number(addKasbonFixedLimit.replace(/\D/g, "")) || 0;
+      const addPercentNum = Number(addKasbonPercentLimit) || 50;
 
       // 3. Save UserProfile doc to Firestore
       const newProfile: UserProfile = {
@@ -578,6 +594,9 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         jobTitle: addJobTitle.trim() || undefined,
         phone: addPhone.trim() || undefined,
         email: finalEmail,
+        kasbonPlafondType: addKasbonPlafondType,
+        kasbonPercentLimit: addKasbonPlafondType === "percent" ? addPercentNum : undefined,
+        kasbonFixedLimit: addKasbonPlafondType === "fixed" ? addFixedNum : undefined,
         createdAt: new Date().toISOString()
       };
 
@@ -599,6 +618,9 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
       setAddCustomEmail("");
       setAddUseCustomEmail(false);
       setAddAccessLevel("");
+      setAddKasbonPlafondType("percent");
+      setAddKasbonPercentLimit("50");
+      setAddKasbonFixedLimit("");
     } catch (err: any) {
       console.warn("Handled team member registration error:", err?.message || err);
       let msg = err?.message || "Terjadi kesalahan saat mendaftarkan anggota tim.";
@@ -813,6 +835,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                   <th className="px-5 py-3.5">Password</th>
                   <th className="px-5 py-3.5">Peran Aktif</th>
                   <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5">Limit Kasbon</th>
                   <th className="px-5 py-3.5">Hak Akses</th>
                   <th className="px-5 py-3.5 text-right">Aksi</th>
                 </tr>
@@ -913,8 +936,32 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                         </button>
                       </td>
 
-                      {/* 5. Hak Akses */}
-                      <td className="px-5 py-3.5 text-slate-300 font-mono text-[11px] max-w-[220px] truncate">
+                      {/* 5. Limit Plafond Kasbon */}
+                      <td className="px-5 py-3.5">
+                        {item.kasbonPlafondType === "fixed" ? (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20" title={`Limit Tetap Bulanan: ${formatRupiah(item.kasbonFixedLimit || 0)}`}>
+                            <Wallet className="w-3 h-3 text-indigo-400" />
+                            <span>{formatRupiah(item.kasbonFixedLimit || 0)}</span>
+                          </span>
+                        ) : item.kasbonPlafondType === "unlimited" ? (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-300 border border-purple-500/20" title="Bebas nominal pengajuan, diverifikasi langsung saat approval">
+                            <Sparkles className="w-3 h-3 text-purple-400" />
+                            <span>Bebas (Unlimited)</span>
+                          </span>
+                        ) : item.kasbonPlafondType === "auto" ? (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="Dihitung 100% dari Honor Event (Point D & PIC) periode berjalan">
+                            <span>100% Honor Event</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20" title={`Limit ${item.kasbonPercentLimit ?? 50}% dari total THP bruto (Gaji/Honor + Reimbursement)`}>
+                            <Wallet className="w-3 h-3 text-amber-400" />
+                            <span>{item.kasbonPercentLimit ?? 50}% THP</span>
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 6. Hak Akses */}
+                      <td className="px-5 py-3.5 text-slate-300 font-mono text-[11px] max-w-[200px] truncate">
                         {item.accessLevel || (
                           item.role === "admin"
                             ? "Akses Penuh (Full Dashboard)"
@@ -924,7 +971,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                         )}
                       </td>
 
-                      {/* 6. Aksi */}
+                      {/* 7. Aksi */}
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end space-x-2">
                           <button
@@ -1566,7 +1613,167 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                   </div>
                 </div>
 
-                {/* 7. Hak Akses */}
+                {/* 7. Pengaturan Limit Plafond Kasbon */}
+                <div className="bg-[#080a0f] border border-slate-800/80 p-3.5 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-850">
+                    <label className="text-slate-200 font-bold text-[10px] uppercase tracking-wider flex items-center space-x-1.5">
+                      <Wallet className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Pengaturan Limit Plafond Kasbon</span>
+                    </label>
+                    <span className="text-[9px] text-slate-500 font-mono">Batas Pengajuan Staff</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                    {/* 1. Persen dari THP (Default 50%) */}
+                    <button
+                      type="button"
+                      onClick={() => setEditKasbonPlafondType("percent")}
+                      className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                        editKasbonPlafondType === "percent"
+                          ? "bg-amber-500/10 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/20"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-xs font-bold">% dari THP</span>
+                        {editKasbonPlafondType === "percent" && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                      </div>
+                      <p className="text-[9.5px] text-slate-400 leading-snug">
+                        {editKasbonPercentLimit || "50"}% dari Total THP Bruto (Gaji + Reimburse)
+                      </p>
+                    </button>
+
+                    {/* 2. Nominal Tetap */}
+                    <button
+                      type="button"
+                      onClick={() => setEditKasbonPlafondType("fixed")}
+                      className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                        editKasbonPlafondType === "fixed"
+                          ? "bg-indigo-500/10 border-indigo-500/40 text-indigo-300 ring-1 ring-indigo-500/20"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-xs font-bold">Nominal Khusus</span>
+                        {editKasbonPlafondType === "fixed" && <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                      </div>
+                      <p className="text-[9.5px] text-slate-400 leading-snug">
+                        Limit bulanan tetap ditentukan Admin
+                      </p>
+                    </button>
+
+                    {/* 3. Otomatis Event */}
+                    <button
+                      type="button"
+                      onClick={() => setEditKasbonPlafondType("auto")}
+                      className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                        editKasbonPlafondType === "auto"
+                          ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300 ring-1 ring-emerald-500/20"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-xs font-bold">100% Honor Event</span>
+                        {editKasbonPlafondType === "auto" && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                      </div>
+                      <p className="text-[9.5px] text-slate-400 leading-snug">
+                        Sesuai Honor Lapangan (Point D & PIC)
+                      </p>
+                    </button>
+
+                    {/* 4. Bebas / Unlimited */}
+                    <button
+                      type="button"
+                      onClick={() => setEditKasbonPlafondType("unlimited")}
+                      className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                        editKasbonPlafondType === "unlimited"
+                          ? "bg-purple-500/10 border-purple-500/40 text-purple-300 ring-1 ring-purple-500/20"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-xs font-bold">Bebas / Unlimited</span>
+                        {editKasbonPlafondType === "unlimited" && <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
+                      </div>
+                      <p className="text-[9.5px] text-slate-400 leading-snug">
+                        Tanpa batas, diverifikasi saat approve
+                      </p>
+                    </button>
+                  </div>
+
+                  {editKasbonPlafondType === "percent" && (
+                    <div className="pt-2 border-t border-slate-850/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-slate-300 text-[10px] font-semibold uppercase">
+                          Persentase dari Total THP Bruto (%)
+                        </label>
+                        <div className="flex items-center space-x-1">
+                          {["30", "50", "70", "100"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setEditKasbonPercentLimit(p)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition ${
+                                editKasbonPercentLimit === p
+                                  ? "bg-amber-500 text-slate-950 font-extrabold"
+                                  : "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                              }`}
+                            >
+                              {p}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          placeholder="50"
+                          step="5"
+                          min="1"
+                          max="100"
+                          value={editKasbonPercentLimit}
+                          onChange={(e) => setEditKasbonPercentLimit(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl py-2 px-3 pr-8 text-xs text-slate-100 font-mono focus:outline-none"
+                        />
+                        <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 text-xs font-mono font-bold">
+                          %
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        💡 <strong>Formula THP:</strong> Plafond kasbon = <strong>{editKasbonPercentLimit || "50"}%</strong> &times; (Total Gaji/Honor + Reimbursement + Tambahan). Sisa gaji bersih yang diterima saat gajian = Total Pendapatan &minus; Kasbon.
+                      </p>
+                    </div>
+                  )}
+
+                  {editKasbonPlafondType === "fixed" && (
+                    <div className="pt-2 border-t border-slate-850/60 space-y-1.5">
+                      <label className="block text-slate-300 text-[10px] font-semibold uppercase">
+                        Nominal Batas Plafond Kasbon Bulanan (Rp)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 text-xs font-mono">
+                          Rp
+                        </span>
+                        <input
+                          type="number"
+                          placeholder="Contoh: 2000000"
+                          step="50000"
+                          min="0"
+                          value={editKasbonFixedLimit}
+                          onChange={(e) => setEditKasbonFixedLimit(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-100 font-mono focus:outline-none"
+                        />
+                      </div>
+                      {editKasbonFixedLimit && Number(editKasbonFixedLimit) > 0 && (
+                        <span className="text-[10px] text-indigo-400 font-mono mt-1 block">
+                          Terbilang: {formatRupiah(Number(editKasbonFixedLimit))} per bulan
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 8. Hak Akses */}
                 <div>
                   <label className="block text-slate-400 font-semibold text-[10px] uppercase tracking-wider mb-1">
                     Deskripsi Hak Akses
@@ -1864,7 +2071,167 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                   );
                 })()}
 
-                {/* 4. Nomor WhatsApp & Keterangan Hak Akses */}
+                {/* 4. Pengaturan Limit Plafond Kasbon */}
+                <div className="bg-[#080a0f] border border-slate-800/80 p-3.5 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-850">
+                    <label className="text-slate-200 font-bold text-[10px] uppercase tracking-wider flex items-center space-x-1.5">
+                      <Wallet className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Pengaturan Limit Plafond Kasbon</span>
+                    </label>
+                    <span className="text-[9px] text-slate-500 font-mono">Batas Pengajuan Staff</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                    {/* 1. Persen dari THP (Default 50%) */}
+                    <button
+                      type="button"
+                      onClick={() => setAddKasbonPlafondType("percent")}
+                      className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                        addKasbonPlafondType === "percent"
+                          ? "bg-amber-500/10 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/20"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-xs font-bold">% dari THP</span>
+                        {addKasbonPlafondType === "percent" && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                      </div>
+                      <p className="text-[9.5px] text-slate-400 leading-snug">
+                        {addKasbonPercentLimit || "50"}% dari Total THP Bruto (Gaji + Reimburse)
+                      </p>
+                    </button>
+
+                    {/* 2. Nominal Tetap */}
+                    <button
+                      type="button"
+                      onClick={() => setAddKasbonPlafondType("fixed")}
+                      className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                        addKasbonPlafondType === "fixed"
+                          ? "bg-indigo-500/10 border-indigo-500/40 text-indigo-300 ring-1 ring-indigo-500/20"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-xs font-bold">Nominal Khusus</span>
+                        {addKasbonPlafondType === "fixed" && <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                      </div>
+                      <p className="text-[9.5px] text-slate-400 leading-snug">
+                        Limit bulanan tetap ditentukan Admin
+                      </p>
+                    </button>
+
+                    {/* 3. Otomatis Event */}
+                    <button
+                      type="button"
+                      onClick={() => setAddKasbonPlafondType("auto")}
+                      className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                        addKasbonPlafondType === "auto"
+                          ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300 ring-1 ring-emerald-500/20"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-xs font-bold">100% Honor Event</span>
+                        {addKasbonPlafondType === "auto" && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                      </div>
+                      <p className="text-[9.5px] text-slate-400 leading-snug">
+                        Sesuai Honor Lapangan (Point D & PIC)
+                      </p>
+                    </button>
+
+                    {/* 4. Bebas / Unlimited */}
+                    <button
+                      type="button"
+                      onClick={() => setAddKasbonPlafondType("unlimited")}
+                      className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                        addKasbonPlafondType === "unlimited"
+                          ? "bg-purple-500/10 border-purple-500/40 text-purple-300 ring-1 ring-purple-500/20"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-xs font-bold">Bebas / Unlimited</span>
+                        {addKasbonPlafondType === "unlimited" && <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
+                      </div>
+                      <p className="text-[9.5px] text-slate-400 leading-snug">
+                        Tanpa batas, diverifikasi saat approve
+                      </p>
+                    </button>
+                  </div>
+
+                  {addKasbonPlafondType === "percent" && (
+                    <div className="pt-2 border-t border-slate-850/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-slate-300 text-[10px] font-semibold uppercase">
+                          Persentase dari Total THP Bruto (%)
+                        </label>
+                        <div className="flex items-center space-x-1">
+                          {["30", "50", "70", "100"].map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setAddKasbonPercentLimit(p)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition ${
+                                addKasbonPercentLimit === p
+                                  ? "bg-amber-500 text-slate-950 font-extrabold"
+                                  : "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                              }`}
+                            >
+                              {p}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          placeholder="50"
+                          step="5"
+                          min="1"
+                          max="100"
+                          value={addKasbonPercentLimit}
+                          onChange={(e) => setAddKasbonPercentLimit(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl py-2 px-3 pr-8 text-xs text-slate-100 font-mono focus:outline-none"
+                        />
+                        <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 text-xs font-mono font-bold">
+                          %
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        💡 <strong>Formula THP:</strong> Plafond kasbon = <strong>{addKasbonPercentLimit || "50"}%</strong> &times; (Total Gaji/Honor + Reimbursement + Tambahan). Sisa gaji bersih yang diterima saat gajian = Total Pendapatan &minus; Kasbon.
+                      </p>
+                    </div>
+                  )}
+
+                  {addKasbonPlafondType === "fixed" && (
+                    <div className="pt-2 border-t border-slate-850/60 space-y-1.5">
+                      <label className="block text-slate-300 text-[10px] font-semibold uppercase">
+                        Nominal Batas Plafond Kasbon Bulanan (Rp)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 text-xs font-mono">
+                          Rp
+                        </span>
+                        <input
+                          type="number"
+                          placeholder="Contoh: 2000000"
+                          step="50000"
+                          min="0"
+                          value={addKasbonFixedLimit}
+                          onChange={(e) => setAddKasbonFixedLimit(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-100 font-mono focus:outline-none"
+                        />
+                      </div>
+                      {addKasbonFixedLimit && Number(addKasbonFixedLimit) > 0 && (
+                        <span className="text-[10px] text-indigo-400 font-mono mt-1 block">
+                          Terbilang: {formatRupiah(Number(addKasbonFixedLimit))} per bulan
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Nomor WhatsApp & Keterangan Hak Akses */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-300 font-bold text-[10px] uppercase tracking-wider mb-1">

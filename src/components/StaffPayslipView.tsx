@@ -574,8 +574,27 @@ export default function StaffPayslipView({
       .reduce((acc, curr) => acc + (curr.amount || 0), 0);
   }, [myKasbonRequests, selectedYear, selectedMonth]);
 
-  // Maximum kasbon that can be requested (cannot exceed Honor Fee & Lapangan)
-  const maxAllowedKasbon = Math.max(0, feeOnlyEarnings - currentPeriodActiveKasbon);
+  // Plafond configuration from user profile
+  const kasbonPlafondType = currentUserProfile.kasbonPlafondType || "percent";
+  const kasbonPercentLimit = currentUserProfile.kasbonPercentLimit ?? 50;
+  const kasbonFixedLimit = currentUserProfile.kasbonFixedLimit || 0;
+  const totalGrossTHP = totalEarnings; // Total THP sebelum kasbon (Gaji/Honor + Reimbursement + Tambahan)
+
+  // Maximum kasbon that can be requested based on policy
+  const maxAllowedKasbon = useMemo(() => {
+    if (kasbonPlafondType === "unlimited") {
+      return Infinity;
+    }
+    if (kasbonPlafondType === "fixed") {
+      return Math.max(0, kasbonFixedLimit - currentPeriodActiveKasbon);
+    }
+    if (kasbonPlafondType === "auto") {
+      return Math.max(0, feeOnlyEarnings - currentPeriodActiveKasbon);
+    }
+    // Default "percent": % of Gross THP (Gaji + Reimbursement)
+    const percentQuota = Math.floor(totalGrossTHP * (kasbonPercentLimit / 100));
+    return Math.max(0, percentQuota - currentPeriodActiveKasbon);
+  }, [kasbonPlafondType, kasbonFixedLimit, kasbonPercentLimit, totalGrossTHP, feeOnlyEarnings, currentPeriodActiveKasbon]);
 
   // Handle staff submitting kasbon request with constraint check
   const handleSubmitKasbon = async (e: React.FormEvent) => {
@@ -585,12 +604,26 @@ export default function StaffPayslipView({
       onNotify("Nominal kasbon harus berupa angka positif!", "error");
       return;
     }
-    if (feeOnlyEarnings <= 0) {
-      onNotify(`Pengajuan tidak dapat diproses: Anda belum memiliki Honor Fee & Lapangan pada periode ${INDONESIAN_MONTH_NAMES[selectedMonth]} ${selectedYear}.`, "error");
+    if (kasbonPlafondType === "percent" && totalGrossTHP <= 0) {
+      onNotify(`Pengajuan tidak dapat diproses: Anda belum memiliki catatan pendapatan (Gaji/Honor/Reimbursement) pada periode ${INDONESIAN_MONTH_NAMES[selectedMonth]} ${selectedYear}. Hubungi Admin jika membutuhkan penyesuaian batas kasbon.`, "error");
       return;
     }
-    if (amountNum > maxAllowedKasbon) {
-      onNotify(`Nominal kasbon (${formatRupiah(amountNum)}) melebihi sisa batas Honor Fee & Lapangan Anda (${formatRupiah(maxAllowedKasbon)})!`, "error");
+    if (kasbonPlafondType === "auto" && feeOnlyEarnings <= 0) {
+      onNotify(`Pengajuan tidak dapat diproses: Anda belum memiliki Honor Fee & Lapangan pada periode ${INDONESIAN_MONTH_NAMES[selectedMonth]} ${selectedYear}. Hubungi Admin jika membutuhkan penyesuaian batas kasbon.`, "error");
+      return;
+    }
+    if (kasbonPlafondType === "fixed" && kasbonFixedLimit <= 0) {
+      onNotify("Batas limit kasbon tetap Anda saat ini belum diatur oleh Admin (Rp 0). Hubungi Admin untuk mengatur limit kasbon Anda.", "error");
+      return;
+    }
+    if (kasbonPlafondType !== "unlimited" && amountNum > maxAllowedKasbon) {
+      const limitLabel =
+        kasbonPlafondType === "fixed"
+          ? "sisa batas limit tetap bulanan"
+          : kasbonPlafondType === "auto"
+          ? "sisa Honor Fee & Lapangan"
+          : `sisa batas limit ${kasbonPercentLimit}% THP`;
+      onNotify(`Nominal kasbon (${formatRupiah(amountNum)}) melebihi ${limitLabel} Anda (${formatRupiah(maxAllowedKasbon)})!`, "error");
       return;
     }
     if (!kasbonReason.trim()) {
@@ -624,7 +657,7 @@ export default function StaffPayslipView({
         createdAt: new Date().toISOString(),
         periodMonth: selectedMonth,
         periodYear: selectedYear,
-        honorFeeBaseline: feeOnlyEarnings,
+        honorFeeBaseline: kasbonPlafondType === "auto" ? feeOnlyEarnings : totalGrossTHP,
         bankName: finalBankName,
         accountNumber: kasbonAccountNumber.trim(),
         accountHolderName: kasbonAccountHolder.trim()
@@ -1793,22 +1826,129 @@ export default function StaffPayslipView({
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-white">Form Pengajuan Kasbon</h3>
-                    <p className="text-[10px] text-slate-400">Maksimal nominal dibatasi oleh Honor Fee & Lapangan</p>
+                    <p className="text-[10px] text-slate-400">
+                      {kasbonPlafondType === "unlimited"
+                        ? "Mode Plafond Bebas (Disetujui Langsung oleh Admin)"
+                        : kasbonPlafondType === "fixed"
+                        ? `Batas Limit Tetap Bulanan: ${formatRupiah(kasbonFixedLimit)}`
+                        : kasbonPlafondType === "auto"
+                        ? "Maksimal 100% dari Honor Fee & Lapangan"
+                        : `Maksimal ${kasbonPercentLimit}% dari Total THP (${formatRupiah(totalGrossTHP)})`}
+                    </p>
                   </div>
                 </div>
 
                 {/* Plafon Status Banner */}
-                {feeOnlyEarnings <= 0 ? (
+                {kasbonPlafondType === "unlimited" ? (
+                  <div className="bg-purple-950/20 border border-purple-500/30 p-3.5 rounded-xl space-y-1 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-purple-300 font-bold">
+                        <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                        <span>Mode Plafond: Bebas / Unlimited</span>
+                      </div>
+                      <span className="text-[9px] font-mono bg-purple-500/15 text-purple-300 px-2 py-0.5 rounded border border-purple-500/30 font-bold uppercase">
+                        Akses Khusus
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-300 leading-relaxed">
+                      Anda memiliki akses pengajuan kasbon fleksibel. Pengajuan akan dievaluasi dan disetujui langsung oleh Admin saat proses approval.
+                    </p>
+                  </div>
+                ) : kasbonPlafondType === "fixed" ? (
+                  kasbonFixedLimit <= 0 ? (
+                    <div className="bg-rose-950/20 border border-rose-500/30 p-3.5 rounded-xl space-y-1.5 text-xs">
+                      <div className="flex items-center space-x-2 text-rose-400 font-bold text-xs">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>Limit Plafond Tetap Belum Diatur (Rp 0)</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-300 leading-relaxed">
+                        Akun Anda diatur ke mode Limit Tetap oleh Admin, namun nominal batas limit saat ini masih <strong>Rp 0</strong>. Hubungi Admin untuk mengatur limit kasbon Anda.
+                      </p>
+                    </div>
+                  ) : maxAllowedKasbon <= 0 ? (
+                    <div className="bg-amber-950/20 border border-amber-500/30 p-3.5 rounded-xl space-y-1.5 text-xs">
+                      <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>Limit Kasbon Periode Ini Telah Habis</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-300 leading-relaxed">
+                        Total kasbon aktif Anda ({formatRupiah(currentPeriodActiveKasbon)}) telah mencapai batas limit tetap bulanan ({formatRupiah(kasbonFixedLimit)}).
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-indigo-950/25 border border-indigo-500/30 p-3 rounded-xl flex items-center justify-between text-xs">
+                      <div>
+                        <div className="flex items-center space-x-1.5 text-[10px] text-indigo-300 uppercase font-mono mb-0.5">
+                          <Wallet className="w-3 h-3 text-indigo-400" />
+                          <span>Sisa Plafon Kasbon Tetap:</span>
+                        </div>
+                        <span className="text-sm font-mono font-extrabold text-indigo-300">{formatRupiah(maxAllowedKasbon)}</span>
+                        <span className="text-[9.5px] text-slate-400 block mt-0.5">
+                          Limit bulanan: {formatRupiah(kasbonFixedLimit)} (Terpakai: {formatRupiah(currentPeriodActiveKasbon)})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setKasbonAmount(maxAllowedKasbon.toString())}
+                        className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                      >
+                        Gunakan Maksimal
+                      </button>
+                    </div>
+                  )
+                ) : kasbonPlafondType === "auto" ? (
+                  feeOnlyEarnings <= 0 ? (
+                    <div className="bg-rose-950/20 border border-rose-500/30 p-3.5 rounded-xl space-y-1.5 text-xs">
+                      <div className="flex items-center space-x-2 text-rose-400 font-bold text-xs">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>Plafon Kasbon Belum Tersedia</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-300 leading-relaxed">
+                        Staf hanya dapat mengajukan kasbon jika telah memiliki catatan <strong>Honor Fee & Lapangan</strong> pada event periode berjalan (<strong>{INDONESIAN_MONTH_NAMES[selectedMonth]} {selectedYear}</strong>).
+                      </p>
+                      <div className="text-[10px] text-slate-400 pt-1 border-t border-rose-900/40">
+                        Honor Fee & Lapangan Anda saat ini: <strong className="text-rose-400 font-mono">{formatRupiah(0)}</strong>
+                      </div>
+                    </div>
+                  ) : maxAllowedKasbon <= 0 ? (
+                    <div className="bg-amber-950/20 border border-amber-500/30 p-3.5 rounded-xl space-y-1.5 text-xs">
+                      <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>Plafon Kasbon Periode Ini Telah Habis</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-300 leading-relaxed">
+                        Total kasbon aktif Anda ({formatRupiah(currentPeriodActiveKasbon)}) telah mencapai batas maksimal total Honor Fee & Lapangan ({formatRupiah(feeOnlyEarnings)}) untuk periode {INDONESIAN_MONTH_NAMES[selectedMonth]} {selectedYear}.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-950/20 border border-emerald-500/25 p-3 rounded-xl flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-mono block">Sisa Plafon Kasbon Tersedia:</span>
+                        <span className="text-sm font-mono font-extrabold text-emerald-400">{formatRupiah(maxAllowedKasbon)}</span>
+                        <span className="text-[9.5px] text-slate-400 block mt-0.5">
+                          Basis Honor Event: {formatRupiah(feeOnlyEarnings)} (Terpakai: {formatRupiah(currentPeriodActiveKasbon)})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setKasbonAmount(maxAllowedKasbon.toString())}
+                        className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                      >
+                        Gunakan Maksimal
+                      </button>
+                    </div>
+                  )
+                ) : totalGrossTHP <= 0 ? (
                   <div className="bg-rose-950/20 border border-rose-500/30 p-3.5 rounded-xl space-y-1.5 text-xs">
                     <div className="flex items-center space-x-2 text-rose-400 font-bold text-xs">
                       <AlertCircle className="w-4 h-4 shrink-0" />
                       <span>Plafon Kasbon Belum Tersedia</span>
                     </div>
                     <p className="text-[10.5px] text-slate-300 leading-relaxed">
-                      Staf hanya dapat mengajukan kasbon jika telah memiliki catatan <strong>Honor Fee & Lapangan</strong> pada event periode berjalan (<strong>{INDONESIAN_MONTH_NAMES[selectedMonth]} {selectedYear}</strong>).
+                      Staf dapat mengajukan kasbon hingga <strong>{kasbonPercentLimit}% dari Total THP</strong> (Gaji/Honor + Reimbursement) setelah memiliki catatan pendapatan pada periode berjalan (<strong>{INDONESIAN_MONTH_NAMES[selectedMonth]} {selectedYear}</strong>).
                     </p>
                     <div className="text-[10px] text-slate-400 pt-1 border-t border-rose-900/40">
-                      Honor Fee & Lapangan Anda saat ini: <strong className="text-rose-400 font-mono">{formatRupiah(0)}</strong>
+                      Total Pendapatan (THP Bruto) saat ini: <strong className="text-rose-400 font-mono">{formatRupiah(0)}</strong>
                     </div>
                   </div>
                 ) : maxAllowedKasbon <= 0 ? (
@@ -1818,19 +1958,25 @@ export default function StaffPayslipView({
                       <span>Plafon Kasbon Periode Ini Telah Habis</span>
                     </div>
                     <p className="text-[10.5px] text-slate-300 leading-relaxed">
-                      Total kasbon aktif Anda ({formatRupiah(currentPeriodActiveKasbon)}) telah mencapai batas maksimal total Honor Fee & Lapangan ({formatRupiah(feeOnlyEarnings)}) untuk periode {INDONESIAN_MONTH_NAMES[selectedMonth]} {selectedYear}.
+                      Total kasbon aktif Anda ({formatRupiah(currentPeriodActiveKasbon)}) telah mencapai batas maksimal <strong>{kasbonPercentLimit}% THP</strong> ({formatRupiah(Math.floor(totalGrossTHP * (kasbonPercentLimit / 100)))}) untuk periode {INDONESIAN_MONTH_NAMES[selectedMonth]} {selectedYear}.
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-emerald-950/20 border border-emerald-500/25 p-3 rounded-xl flex items-center justify-between text-xs">
+                  <div className="bg-amber-950/20 border border-amber-500/30 p-3 rounded-xl flex items-center justify-between text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-mono block">Sisa Plafon Kasbon Tersedia:</span>
-                      <span className="text-sm font-mono font-extrabold text-emerald-400">{formatRupiah(maxAllowedKasbon)}</span>
+                      <div className="flex items-center space-x-1.5 text-[10px] text-amber-300 uppercase font-mono mb-0.5">
+                        <Wallet className="w-3 h-3 text-amber-400" />
+                        <span>Sisa Plafon Kasbon ({kasbonPercentLimit}% THP):</span>
+                      </div>
+                      <span className="text-sm font-mono font-extrabold text-amber-300">{formatRupiah(maxAllowedKasbon)}</span>
+                      <span className="text-[9.5px] text-slate-400 block mt-0.5">
+                        Total THP Bruto: {formatRupiah(totalGrossTHP)} &bull; Kuota {kasbonPercentLimit}%: {formatRupiah(Math.floor(totalGrossTHP * (kasbonPercentLimit / 100)))} &bull; Terpakai: {formatRupiah(currentPeriodActiveKasbon)}
+                      </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setKasbonAmount(maxAllowedKasbon.toString())}
-                      className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                      className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-bold transition cursor-pointer"
                     >
                       Gunakan Maksimal
                     </button>
@@ -1843,9 +1989,14 @@ export default function StaffPayslipView({
                       <label className="text-slate-400 font-semibold text-xs uppercase tracking-wider text-[10px]">
                         Nominal Kasbon (Rp)
                       </label>
-                      {maxAllowedKasbon > 0 && (
+                      {kasbonPlafondType !== "unlimited" && maxAllowedKasbon > 0 && (
                         <span className="text-[10px] font-mono text-slate-400">
                           Maks: <strong className="text-amber-400">{formatRupiah(maxAllowedKasbon)}</strong>
+                        </span>
+                      )}
+                      {kasbonPlafondType === "unlimited" && (
+                        <span className="text-[10px] font-mono text-purple-300 font-bold">
+                          Mode Unlimited
                         </span>
                       )}
                     </div>
@@ -1855,15 +2006,21 @@ export default function StaffPayslipView({
                       </span>
                       <input
                         type="number"
-                        placeholder={maxAllowedKasbon > 0 ? `Contoh: ${Math.min(500000, maxAllowedKasbon)}` : "Plafon belum tersedia"}
+                        placeholder={
+                          kasbonPlafondType === "unlimited"
+                            ? "Contoh: 1000000"
+                            : maxAllowedKasbon > 0
+                            ? `Contoh: ${Math.min(500000, maxAllowedKasbon)}`
+                            : "Plafon belum tersedia"
+                        }
                         min="10000"
-                        max={maxAllowedKasbon > 0 ? maxAllowedKasbon : undefined}
+                        max={kasbonPlafondType === "unlimited" ? undefined : (maxAllowedKasbon > 0 ? maxAllowedKasbon : undefined)}
                         step="5000"
-                        disabled={maxAllowedKasbon <= 0}
+                        disabled={kasbonPlafondType === "unlimited" ? false : maxAllowedKasbon <= 0}
                         value={kasbonAmount}
                         onChange={(e) => setKasbonAmount(e.target.value)}
                         className={`w-full bg-[#080a0f] border rounded-xl py-2 pl-9 pr-3 text-xs text-slate-200 focus:outline-none font-mono disabled:opacity-50 disabled:cursor-not-allowed ${
-                          Number(kasbonAmount) > maxAllowedKasbon
+                          kasbonPlafondType !== "unlimited" && Number(kasbonAmount) > maxAllowedKasbon
                             ? "border-rose-500 focus:border-rose-400 text-rose-300"
                             : "border-slate-800 focus:border-amber-500"
                         }`}
@@ -1872,20 +2029,28 @@ export default function StaffPayslipView({
                     </div>
 
                     {/* Real-time validation feedback */}
-                    {kasbonAmount && Number(kasbonAmount) > maxAllowedKasbon && (
+                    {kasbonAmount && kasbonPlafondType !== "unlimited" && Number(kasbonAmount) > maxAllowedKasbon && (
                       <div className="mt-1.5 flex items-center space-x-1.5 text-[10px] text-rose-400 font-semibold">
                         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>Nominal melebihi sisa Honor Fee & Lapangan ({formatRupiah(maxAllowedKasbon)})!</span>
+                        <span>
+                          Nominal melebihi {kasbonPlafondType === "fixed" ? "limit tetap bulanan" : "sisa Honor Fee & Lapangan"} ({formatRupiah(maxAllowedKasbon)})!
+                        </span>
                       </div>
                     )}
-                    {kasbonAmount && Number(kasbonAmount) > 0 && Number(kasbonAmount) <= maxAllowedKasbon && (
+                    {kasbonAmount && Number(kasbonAmount) > 0 && (kasbonPlafondType === "unlimited" || Number(kasbonAmount) <= maxAllowedKasbon) && (
                       <div className="mt-1.5 space-y-0.5">
                         <span className="text-[10px] text-amber-400 font-mono block">
                           Terbilang: {formatRupiah(Number(kasbonAmount))}
                         </span>
-                        <span className="text-[10px] text-emerald-400/90 font-mono block">
-                          ✓ Sisa plafon setelah kasbon: {formatRupiah(maxAllowedKasbon - Number(kasbonAmount))}
-                        </span>
+                        {kasbonPlafondType !== "unlimited" ? (
+                          <span className="text-[10px] text-emerald-400/90 font-mono block">
+                            ✓ Sisa plafon setelah kasbon: {formatRupiah(maxAllowedKasbon - Number(kasbonAmount))}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-purple-300 font-mono block">
+                            ✓ Pengajuan kasbon fleksibel (akan dievaluasi saat approval)
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1896,7 +2061,7 @@ export default function StaffPayslipView({
                     </label>
                     <textarea
                       rows={2}
-                      disabled={maxAllowedKasbon <= 0}
+                      disabled={kasbonPlafondType === "unlimited" ? false : maxAllowedKasbon <= 0}
                       placeholder="Contoh: Kebutuhan operasional bensin event luar kota / kebutuhan mendesak..."
                       value={kasbonReason}
                       onChange={(e) => setKasbonReason(e.target.value)}
@@ -1920,7 +2085,7 @@ export default function StaffPayslipView({
                         <select
                           value={kasbonBankName}
                           onChange={(e) => setKasbonBankName(e.target.value)}
-                          disabled={maxAllowedKasbon <= 0}
+                          disabled={kasbonPlafondType === "unlimited" ? false : maxAllowedKasbon <= 0}
                           className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-lg py-1.5 px-2.5 text-xs text-slate-200 focus:outline-none disabled:opacity-50"
                           required
                         >
@@ -1942,7 +2107,7 @@ export default function StaffPayslipView({
                             placeholder="Misal: Bank Jatim, Blu by BCA..."
                             value={kasbonCustomBank}
                             onChange={(e) => setKasbonCustomBank(e.target.value)}
-                            disabled={maxAllowedKasbon <= 0}
+                            disabled={kasbonPlafondType === "unlimited" ? false : maxAllowedKasbon <= 0}
                             className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-lg py-1.5 px-2.5 text-xs text-slate-200 focus:outline-none disabled:opacity-50"
                             required
                           />
