@@ -1,0 +1,6 @@
+{
+  "name": "Keuangan Mateha Production",
+  "description": "Aplikasi pemantauan arus kas, rancangan anggaran biaya (RAB), dan realisasi biaya proyek untuk Mateha Production secara real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

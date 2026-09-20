@@ -1,0 +1,997 @@
+import React, { useState, useEffect } from "react";
+import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "firebase/firestore";
+import { db, sanitizeForFirestore } from "../utils/firebase";
+import { Invoice, InvoiceItem, formatRupiah, Bank, Client } from "../types";
+import { Plus, Trash2, Save, FileText, Eye, Download, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users } from "lucide-react";
+import InvoicePreview from "./InvoicePreview";
+import BankManagementModal from "./BankManagementModal";
+import ClientManagement from "./ClientManagement";
+import ClientSelector from "./ClientSelector";
+import { bulkExport } from "../utils/bulkExport";
+import { generateInvoicePdfBlob } from "../utils/pdfGenerator";
+import { saveAs } from "file-saver";
+
+export default function InvoiceView() {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
+  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [editModeId, setEditModeId] = useState<string | null>(null);
+  const [editingInvoiceNumber, setEditingInvoiceNumber] = useState<string>("");
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Modals state
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+
+  // Form states
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerContact, setCustomerContact] = useState("");
+  const [subject, setSubject] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [dueDate, setDueDate] = useState("");
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [termsAndConditions, setTermsAndConditions] = useState("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
+  const [saveToClientDb, setSaveToClientDb] = useState(false);
+
+  // New item draft input
+  const [newItem, setNewItem] = useState({ description: "", qty: 1, price: 0 });
+
+  // Individual item inline editing state
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [editItemDraft, setEditItemDraft] = useState<{ description: string; qty: number; price: number }>({
+    description: "",
+    qty: 1,
+    price: 0,
+  });
+
+  useEffect(() => {
+    const qInv = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
+    const unsubInv = onSnapshot(qInv, (snapshot) => {
+      const invs: Invoice[] = [];
+      snapshot.forEach((doc) => invs.push({ ...doc.data() } as Invoice));
+      setInvoices(invs);
+    });
+
+    const qBank = collection(db, "banks");
+    const unsubBank = onSnapshot(qBank, (snapshot) => {
+      const bks: Bank[] = [];
+      snapshot.forEach((doc) => bks.push({ id: doc.id, ...doc.data() } as Bank));
+      setBanks(bks);
+      // Auto-select default bank if none selected yet
+      if (bks.length > 0 && selectedBankIds.length === 0) {
+        const defaults = bks.filter(b => b.isDefault).map(b => b.id);
+        if (defaults.length > 0) setSelectedBankIds(defaults);
+      }
+    });
+
+    const qClients = query(collection(db, "clients"), orderBy("createdAt", "desc"));
+    const unsubClients = onSnapshot(qClients, (snapshot) => {
+      const cls: Client[] = [];
+      snapshot.forEach((doc) => cls.push({ id: doc.id, ...doc.data() } as Client));
+      setClients(cls);
+    });
+
+    return () => { unsubInv(); unsubBank(); unsubClients(); };
+  }, []);
+
+  const handleSelectClient = (client: Client) => {
+    setCustomerName(client.name);
+    if (client.phone) setCustomerPhone(client.phone);
+    if (client.company) setCustomerContact(client.company);
+  };
+
+  const toggleBank = (id: string) => {
+    setSelectedBankIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const addItem = () => {
+    if (!newItem.description.trim() || newItem.price <= 0) {
+      alert("Mohon isi deskripsi item dan nominal harga yang valid.");
+      return;
+    }
+    const item: InvoiceItem = {
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+      description: newItem.description.trim(),
+      qty: newItem.qty || 1,
+      price: newItem.price,
+      total: (newItem.qty || 1) * newItem.price,
+    };
+    setItems([...items, item]);
+    setNewItem({ description: "", qty: 1, price: 0 });
+  };
+
+  const startEditItem = (index: number) => {
+    const itm = items[index];
+    setEditingItemIndex(index);
+    setEditItemDraft({
+      description: itm.description,
+      qty: itm.qty,
+      price: itm.price,
+    });
+  };
+
+  const saveEditedItem = () => {
+    if (editingItemIndex === null) return;
+    if (!editItemDraft.description.trim() || editItemDraft.price <= 0) {
+      alert("Deskripsi dan harga item tidak boleh kosong.");
+      return;
+    }
+    const updated = [...items];
+    const qty = editItemDraft.qty || 1;
+    const price = editItemDraft.price || 0;
+    updated[editingItemIndex] = {
+      ...updated[editingItemIndex],
+      description: editItemDraft.description.trim(),
+      qty,
+      price,
+      total: qty * price,
+    };
+    setItems(updated);
+    setEditingItemIndex(null);
+  };
+
+  const cancelEditItem = () => {
+    setEditingItemIndex(null);
+  };
+
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === items.length - 1) return;
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    const updated = [...items];
+    const temp = updated[index];
+    updated[index] = updated[targetIdx];
+    updated[targetIdx] = temp;
+    setItems(updated);
+    if (editingItemIndex !== null) setEditingItemIndex(null);
+  };
+
+  const insertBulletPoint = (isDraft: boolean) => {
+    if (isDraft) {
+      const current = newItem.description;
+      const prefix = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
+      setNewItem({ ...newItem, description: current + prefix + "- " });
+    } else {
+      const current = editItemDraft.description;
+      const prefix = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
+      setEditItemDraft({ ...editItemDraft, description: current + prefix + "- " });
+    }
+  };
+
+  const generateInvoiceNumber = () => {
+    const d = new Date(date);
+    const yyyy = !isNaN(d.getFullYear()) ? d.getFullYear() : new Date().getFullYear();
+    const mm = String(!isNaN(d.getMonth()) ? d.getMonth() + 1 : new Date().getMonth() + 1).padStart(2, '0');
+    const prefix = `INV/MATEHA/${yyyy}/${mm}/`;
+    
+    const relevantInvoices = invoices.filter(inv => inv.invoiceNumber && inv.invoiceNumber.startsWith(prefix));
+    let nextSeq = 1;
+    if (relevantInvoices.length > 0) {
+      const sequences = relevantInvoices.map(inv => {
+        const parts = inv.invoiceNumber.split('/');
+        return parseInt(parts[parts.length - 1], 10) || 0;
+      });
+      nextSeq = Math.max(...sequences) + 1;
+    }
+    
+    return `${prefix}${String(nextSeq).padStart(3, '0')}`;
+  };
+
+  const updateInvoiceStatus = async (id: string, newStatus: "draft" | "sent" | "paid") => {
+    await updateDoc(doc(db, "invoices", id), { status: newStatus });
+  };
+
+  const handleConfirmDelete = async () => {
+    for (const inv of invoices) {
+      await deleteDoc(doc(db, "invoices", inv.id));
+    }
+    setShowDeleteConfirm(false);
+    cancelEdit();
+  };
+
+  const handleDeleteSingle = async (id: string) => {
+    if (confirm("Apakah Anda yakin ingin menghapus invoice ini?")) {
+      await deleteDoc(doc(db, "invoices", id));
+      if (editModeId === id) cancelEdit();
+    }
+  };
+
+  const editInvoice = (inv: Invoice) => {
+    setEditModeId(inv.id);
+    setEditingInvoiceNumber(inv.invoiceNumber);
+    setCustomerName(inv.customerName);
+    setCustomerPhone(inv.customerPhone || "");
+    setCustomerContact(inv.customerContact || "");
+    setSubject(inv.subject || "");
+    setDate(inv.date);
+    setDueDate(inv.dueDate || "");
+    setItems(inv.items ? JSON.parse(JSON.stringify(inv.items)) : []);
+    setSelectedBankIds(inv.selectedBanks ? inv.selectedBanks.map(b => b.id) : []);
+    setTermsAndConditions(inv.termsAndConditions || "Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
+    setEditingItemIndex(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => {
+    setEditModeId(null);
+    setEditingInvoiceNumber("");
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerContact("");
+    setSubject("");
+    setItems([]);
+    setDate(new Date().toISOString().split("T")[0]);
+    setDueDate("");
+    setSelectedBankIds([]);
+    setTermsAndConditions("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
+    setEditingItemIndex(null);
+  };
+
+  const saveInvoice = async () => {
+    if (!customerName.trim() || items.length === 0) {
+      alert("Mohon isi Nama Klien dan minimal 1 item tagihan.");
+      return;
+    }
+    const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
+    const grandTotal = items.reduce((sum, item) => sum + item.total, 0);
+    
+    try {
+      if (editModeId) {
+        await updateDoc(doc(db, "invoices", editModeId), {
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          customerContact: customerContact.trim(),
+          subject: subject.trim() || "Tagihan Layanan Event",
+          date,
+          dueDate,
+          items,
+          grandTotal,
+          selectedBanks,
+          termsAndConditions: termsAndConditions.trim()
+        });
+        alert(`Perubahan invoice ${editingInvoiceNumber || ""} berhasil disimpan!`);
+        cancelEdit();
+      } else {
+        const id = Date.now().toString();
+        const invoiceNumber = generateInvoiceNumber();
+        const newInvoice: Invoice = {
+          id,
+          invoiceNumber,
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          customerContact: customerContact.trim(),
+          subject: subject.trim() || "Tagihan Layanan Event",
+          date,
+          dueDate,
+          items,
+          grandTotal,
+          status: "draft",
+          createdAt: new Date().toISOString(),
+          selectedBanks,
+          termsAndConditions: termsAndConditions.trim(),
+        };
+        await setDoc(doc(db, "invoices", id), sanitizeForFirestore(newInvoice));
+        alert(`Faktur Invoice ${invoiceNumber} berhasil dibuat!`);
+        
+        {/* If requested, save new client to database */}
+        if (saveToClientDb && customerName.trim()) {
+          const clientExists = clients.some(c => c.name.toLowerCase() === customerName.trim().toLowerCase());
+          if (!clientExists) {
+            const clientId = "client_" + Date.now();
+            const clientDoc: Partial<Client> = {
+              id: clientId,
+              name: customerName.trim(),
+              createdAt: new Date().toISOString(),
+            };
+            if (customerContact.trim()) clientDoc.company = customerContact.trim();
+            if (customerPhone.trim()) clientDoc.phone = customerPhone.trim();
+            await setDoc(doc(db, "clients", clientId), sanitizeForFirestore(clientDoc));
+          }
+        }
+
+        // Reset form
+        setCustomerName("");
+        setCustomerPhone("");
+        setCustomerContact("");
+        setSubject("");
+        setItems([]);
+        setDate(new Date().toISOString().split("T")[0]);
+        setDueDate("");
+        setSelectedBankIds([]);
+        setSaveToClientDb(false);
+        setTermsAndConditions("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
+      }
+    } catch (error) {
+      console.error("Error saving invoice:", error);
+      alert("Gagal menyimpan invoice.");
+    }
+  };
+
+  const downloadPdfDirect = async (inv: Invoice) => {
+    setDownloadingId(inv.id);
+    try {
+      const blob = await generateInvoicePdfBlob(inv);
+      const cleanFileName = `Invoice_${inv.invoiceNumber.replace(/\//g, '_')}_${inv.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      saveAs(blob, cleanFileName);
+    } catch (err) {
+      console.error("Error exporting invoice PDF:", err);
+      alert("Gagal mengunduh PDF. Silakan coba lagi.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const filteredInvoices = invoices.filter(inv => 
+    inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (inv.subject && inv.subject.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const grandTotalAll = items.reduce((sum, item) => sum + item.total, 0);
+
+  return (
+    <div className="text-white space-y-6">
+      {selectedInvoice && <InvoicePreview invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />}
+      
+      {/* Bank Management Modal */}
+      <BankManagementModal
+        isOpen={isBankModalOpen}
+        onClose={() => setIsBankModalOpen(false)}
+        banks={banks}
+        onSelectBank={(b) => {
+          if (!selectedBankIds.includes(b.id)) {
+            setSelectedBankIds([...selectedBankIds, b.id]);
+          }
+        }}
+      />
+
+      {/* Client Management Modal */}
+      <ClientManagement
+        isModal={true}
+        isOpen={isClientModalOpen}
+        onClose={() => setIsClientModalOpen(false)}
+        onSelectClient={handleSelectClient}
+      />
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-bold mb-2 text-white">Hapus Semua Invoice</h3>
+            <p className="text-slate-400 text-xs mb-6 leading-relaxed">Apakah Anda yakin ingin menghapus semua invoice? Tindakan ini tidak dapat dibatalkan.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 cursor-pointer">Batal</button>
+              <button onClick={handleConfirmDelete} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950 cursor-pointer">Hapus Semua</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER SECTION */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+            <FileText className="w-6 h-6 text-blue-400" />
+            <span>Manajemen Invoice Tagihan</span>
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">Buat, kelola, cetak, edit rincian item, dan ekspor invoice tagihan resmi Mateha Production.</p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {/* Quick Bank Database Button */}
+          <button
+            type="button"
+            onClick={() => setIsBankModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-cyan-400 font-bold text-xs py-2 px-3 rounded-xl transition cursor-pointer"
+            title="Kelola daftar rekening bank transfer resmi"
+          >
+            <Building2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Database Bank ({banks.length})</span>
+          </button>
+
+          {/* Quick Client Database Button */}
+          <button
+            type="button"
+            onClick={() => setIsClientModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-cyan-400 font-bold text-xs py-2 px-3 rounded-xl transition cursor-pointer"
+            title="Kelola daftar database klien untuk repeat order"
+          >
+            <Users className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Database Klien ({clients.length})</span>
+          </button>
+
+          {selectedInvoices.length > 0 && (
+            <button
+              onClick={() => bulkExport(selectedInvoices, invoices)}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-lg shadow-blue-950 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Bulk Export ({selectedInvoices.length})</span>
+            </button>
+          )}
+
+          {invoices.length > 0 && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs font-semibold transition cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Hapus Semua</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* CREATE / EDIT FORM */}
+      <div className={`p-6 rounded-2xl border shadow-xl space-y-6 transition ${
+        editModeId 
+          ? "bg-slate-900/90 border-blue-500/50 ring-1 ring-blue-500/30" 
+          : "bg-slate-900/60 border-slate-800"
+      }`}>
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-2.5">
+            <span className={`w-2.5 h-2.5 rounded-full ${editModeId ? "bg-amber-400 animate-pulse" : "bg-blue-400"}`} />
+            <div>
+              <h2 className="text-base font-bold text-white">
+                {editModeId ? "Mode Edit Invoice Tagihan" : "Buat Invoice Tagihan Baru"}
+              </h2>
+              {editModeId && (
+                <p className="text-xs font-mono text-blue-400 font-semibold">{editingInvoiceNumber}</p>
+              )}
+            </div>
+          </div>
+          {editModeId && (
+            <button
+              onClick={cancelEdit}
+              className="text-xs bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 text-slate-300 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" /> Batal Edit
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-slate-400 font-semibold block">Nama Klien / Perusahaan *</label>
+              <ClientSelector
+                clients={clients}
+                onSelectClient={handleSelectClient}
+                onOpenClientManager={() => setIsClientModalOpen(true)}
+                selectedClientName={customerName}
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Contoh: PT Sumber Makmur / Bpk. Rudi"
+              className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-white focus:border-blue-500 focus:outline-none"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+            />
+            {customerName && !clients.some(c => c.name.toLowerCase() === customerName.toLowerCase()) && (
+              <label className="flex items-center gap-1.5 mt-1.5 text-[11px] text-cyan-400/90 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveToClientDb}
+                  onChange={(e) => setSaveToClientDb(e.target.checked)}
+                  className="rounded border-slate-750 text-cyan-500 focus:ring-0 w-3.5 h-3.5 bg-slate-900"
+                />
+                <span>Simpan "{customerName}" ke Database Klien</span>
+              </label>
+            )}
+          </div>
+
+          <div>
+            <label className="text-slate-400 font-semibold mb-1.5 block">Perihal / Deskripsi Tagihan</label>
+            <input
+              type="text"
+              placeholder="Contoh: Tagihan Sewa Sound System & LED Screen"
+              className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-white focus:border-blue-500 focus:outline-none"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-400 font-semibold mb-1.5 block">No. Telepon / WhatsApp</label>
+            <input
+              type="text"
+              placeholder="0812-xxxx-xxxx"
+              className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-white focus:border-blue-500 focus:outline-none"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-400 font-semibold mb-1.5 block">Kontak Person (PIC / Instansi)</label>
+            <input
+              type="text"
+              placeholder="Nama PIC Klien"
+              className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-white focus:border-blue-500 focus:outline-none"
+              value={customerContact}
+              onChange={(e) => setCustomerContact(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-400 font-semibold mb-1.5 block">Tanggal Invoice</label>
+            <input
+              type="date"
+              className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-white focus:border-blue-500 focus:outline-none"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-400 font-semibold mb-1.5 block">Jatuh Tempo (Opsional)</label>
+            <input
+              type="date"
+              className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-white focus:border-blue-500 focus:outline-none"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Bank accounts select */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs text-slate-400 font-semibold block">Pilih Rekening Pembayaran Resmi:</label>
+            <button
+              type="button"
+              onClick={() => setIsBankModalOpen(true)}
+              className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+            >
+              <Building2 className="w-3 h-3" />
+              <span>+ Kelola Database Bank</span>
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {banks.map(b => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => toggleBank(b.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                  selectedBankIds.includes(b.id)
+                    ? "bg-blue-500/20 border-blue-500/50 text-blue-300"
+                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {b.name} - {b.accountNumber} ({b.accountHolder})
+              </button>
+            ))}
+            {banks.length === 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 italic">Belum ada data rekening bank.</span>
+                <button
+                  type="button"
+                  onClick={() => setIsBankModalOpen(true)}
+                  className="text-xs text-cyan-400 font-bold hover:underline"
+                >
+                  + Tambah Rekening Bank Sekarang
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Terms and Conditions */}
+        <div>
+          <label className="text-xs text-slate-400 font-semibold mb-1.5 block">Syarat dan Ketentuan Pembayaran</label>
+          <textarea
+            className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-xs text-white focus:border-blue-500 focus:outline-none"
+            value={termsAndConditions}
+            onChange={(e) => setTermsAndConditions(e.target.value)}
+            rows={2}
+            placeholder="Instruksi transfer, batas waktu pelunasan, konfirmasi bukti bayar..."
+          />
+        </div>
+
+        {/* Items Input & Manager */}
+        <div className="bg-slate-950/70 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <span>Rincian Item Tagihan</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-blue-400 text-[11px] font-mono">
+                {items.length} Item
+              </span>
+            </h3>
+            <span className="text-[11px] text-slate-400">Deskripsi dapat diedit langsung per item</span>
+          </div>
+          
+          {/* New Item Form */}
+          <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">Tambah Item Baru:</span>
+              <button
+                type="button"
+                onClick={() => insertBulletPoint(true)}
+                className="flex items-center space-x-1 text-[10px] text-slate-400 hover:text-blue-300 transition bg-slate-950 px-2 py-1 rounded-md border border-slate-800 cursor-pointer"
+                title="Tambahkan baris poin (- )"
+              >
+                <ListPlus className="w-3 h-3" />
+                <span>+ Poin (-)</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-2.5 items-stretch md:items-start">
+              <textarea
+                placeholder="Deskripsi item tagihan (Bisa multi-baris, gunakan '-' untuk rincian)..."
+                className="flex-1 bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs text-white focus:border-blue-500 focus:outline-none min-h-[68px]"
+                value={newItem.description}
+                onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                rows={2}
+              />
+              <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+                <div className="w-20">
+                  <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Qty</label>
+                  <input
+                    type="number"
+                    placeholder="Qty"
+                    min="1"
+                    className="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-white text-center focus:border-blue-500 focus:outline-none font-semibold"
+                    value={newItem.qty || ""}
+                    onChange={(e) => setNewItem({ ...newItem, qty: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="w-36">
+                  <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Harga Satuan (Rp)</label>
+                  <input
+                    type="number"
+                    placeholder="Harga"
+                    min="0"
+                    className="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-white focus:border-blue-500 focus:outline-none font-mono"
+                    value={newItem.price || ""}
+                    onChange={(e) => setNewItem({ ...newItem, price: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="self-end pt-5">
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-lg shadow-blue-950 cursor-pointer h-[38px]"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Items List with Interactive Editing */}
+          {items.length === 0 ? (
+            <div className="text-center py-6 text-slate-500 text-xs italic bg-slate-900/30 rounded-xl border border-dashed border-slate-800">
+              Belum ada item tagihan. Masukkan deskripsi item dan harga di atas.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {items.map((item, idx) => {
+                const isEditingThis = editingItemIndex === idx;
+
+                if (isEditingThis) {
+                  return (
+                    <div
+                      key={item.id || idx}
+                      className="bg-slate-900 border-2 border-blue-500/70 p-4 rounded-xl shadow-lg space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-blue-400">Edit Rincian Item #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => insertBulletPoint(false)}
+                          className="flex items-center space-x-1 text-[10px] text-slate-300 hover:text-blue-300 transition bg-slate-950 px-2 py-0.5 rounded border border-slate-700 cursor-pointer"
+                        >
+                          <ListPlus className="w-3 h-3" />
+                          <span>+ Poin (-)</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-slate-400 font-semibold block">Deskripsi Isi Item:</label>
+                        <textarea
+                          className="w-full bg-slate-950 border border-slate-700 p-2.5 rounded-xl text-xs text-white focus:border-blue-400 focus:outline-none"
+                          value={editItemDraft.description}
+                          onChange={(e) => setEditItemDraft({ ...editItemDraft, description: e.target.value })}
+                          rows={3}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div>
+                          <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Qty:</label>
+                          <input
+                            type="number"
+                            min="1"
+                            className="w-full bg-slate-950 border border-slate-700 p-2 rounded-xl text-xs text-white text-center focus:border-blue-400 focus:outline-none font-bold"
+                            value={editItemDraft.qty || ""}
+                            onChange={(e) => setEditItemDraft({ ...editItemDraft, qty: parseInt(e.target.value) || 0 })}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Harga Satuan (Rp):</label>
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-full bg-slate-950 border border-slate-700 p-2 rounded-xl text-xs text-white focus:border-blue-400 focus:outline-none font-mono"
+                            value={editItemDraft.price || ""}
+                            onChange={(e) => setEditItemDraft({ ...editItemDraft, price: parseInt(e.target.value) || 0 })}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={cancelEditItem}
+                            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" /> Batal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={saveEditedItem}
+                            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-950 cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" /> Simpan Item
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="text-right text-[11px] text-blue-300 font-mono">
+                        Subtotal perkiraan: <strong>{formatRupiah((editItemDraft.qty || 1) * (editItemDraft.price || 0))}</strong>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={item.id || idx}
+                    className="flex flex-col sm:flex-row sm:items-start justify-between bg-slate-900/90 hover:bg-slate-900 px-4 py-3 rounded-xl border border-slate-800/90 text-xs gap-3 transition"
+                  >
+                    <div className="flex items-start gap-3 flex-1">
+                      <span className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center font-mono font-bold text-[11px] text-slate-400 shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 space-y-1">
+                        <div className="font-semibold text-slate-100 whitespace-pre-line leading-relaxed">
+                          {item.description}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          Qty: <strong className="text-slate-300">{item.qty}</strong> @ <span className="font-mono">{formatRupiah(item.price)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 self-end sm:self-center shrink-0 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+                      <span className="font-bold text-blue-400 font-mono text-sm">
+                        {formatRupiah(item.total)}
+                      </span>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveItem(idx, 'up')}
+                          disabled={idx === 0}
+                          className="text-slate-500 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-20 cursor-pointer"
+                          title="Pindah ke Atas"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveItem(idx, 'down')}
+                          disabled={idx === items.length - 1}
+                          className="text-slate-500 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-20 cursor-pointer"
+                          title="Pindah ke Bawah"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startEditItem(idx)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-blue-500/20 text-slate-300 hover:text-blue-300 text-xs font-semibold transition cursor-pointer border border-slate-700"
+                          title="Edit Deskripsi Item"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                          title="Hapus Baris"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-between items-center px-4 py-3 bg-slate-900/95 rounded-xl border border-slate-700/80 mt-3">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">TOTAL TAGIHAN:</span>
+                <span className="text-base font-extrabold text-blue-400 font-mono">{formatRupiah(grandTotalAll)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-2">
+          {editModeId && (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+            >
+              Batal
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={saveInvoice}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-xl font-bold text-xs text-white transition shadow-lg shadow-emerald-950 cursor-pointer"
+          >
+            <Save className="w-4 h-4" />
+            <span>{editModeId ? "Simpan Perubahan Invoice" : "Terbitkan Invoice"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* LIST OF INVOICES */}
+      <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <span>Daftar Dokumen Tagihan</span>
+            <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-xs font-mono">{invoices.length}</span>
+          </h2>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+            <input
+              type="text"
+              placeholder="Cari no. invoice / klien..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 pl-8 pr-3 py-2 rounded-xl text-xs text-slate-200 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {filteredInvoices.length === 0 ? (
+          <div className="text-center py-12 text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">
+            Tidak ada invoice yang ditemukan.
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {filteredInvoices.map((inv) => {
+              const isDownloading = downloadingId === inv.id;
+              const isSelected = selectedInvoices.includes(inv.id);
+
+              return (
+                <div
+                  key={inv.id}
+                  className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border transition gap-3 ${
+                    isSelected ? "bg-slate-900 border-blue-500/60" : "bg-slate-950/80 border-slate-800/80 hover:border-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedInvoices(prev => prev.includes(inv.id) ? prev.filter(i => i !== inv.id) : [...prev, inv.id]);
+                      }}
+                      className="rounded border-slate-700 text-blue-600 focus:ring-0 w-4 h-4 cursor-pointer"
+                    />
+
+                    <div className="flex-1 cursor-pointer" onClick={() => setSelectedInvoice(inv)}>
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-bold text-white text-sm">{inv.invoiceNumber}</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="font-semibold text-blue-300 text-sm">{inv.customerName}</span>
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${
+                          inv.status === "paid" 
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" 
+                            : inv.status === "sent"
+                            ? "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                            : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                        }`}>
+                          {inv.status === "paid" ? "Lunas" : inv.status === "sent" ? "Terkirim" : "Draft"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
+                        <span>Tanggal: {inv.date}</span>
+                        {inv.subject && <span>| {inv.subject}</span>}
+                        <span>| Total: <strong className="text-slate-200 font-mono">{formatRupiah(inv.grandTotal)}</strong></span>
+                        {inv.dueDate && <span className="text-rose-400">| Jatuh Tempo: {inv.dueDate}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end md:self-auto flex-wrap">
+                    {inv.status === "draft" && (
+                      <button
+                        onClick={() => updateInvoiceStatus(inv.id, "sent")}
+                        className="px-2.5 py-1.5 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/60 text-sky-300 text-xs font-semibold transition cursor-pointer"
+                        title="Tandai Terkirim"
+                      >
+                        Kirim
+                      </button>
+                    )}
+                    {inv.status !== "paid" && (
+                      <button
+                        onClick={() => updateInvoiceStatus(inv.id, "paid")}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-bold transition cursor-pointer"
+                        title="Tandai Lunas"
+                      >
+                        Set Lunas
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => setSelectedInvoice(inv)}
+                      className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                      title="Lihat Pratinjau"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Lihat</span>
+                    </button>
+
+                    <button
+                      onClick={() => downloadPdfDirect(inv)}
+                      disabled={isDownloading}
+                      className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 border border-blue-700/60 text-blue-300 text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                      title="Unduh PDF"
+                    >
+                      {isDownloading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>PDF...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => editInvoice(inv)}
+                      className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
+                      title="Edit Dokumen Invoice"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Edit</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteSingle(inv.id)}
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 border border-slate-800 hover:border-rose-700 text-slate-500 hover:text-rose-400 transition cursor-pointer"
+                      title="Hapus"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

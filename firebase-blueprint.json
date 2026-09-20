@@ -1,0 +1,147 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "User profile with role management",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff", "finance"] },
+        "email": { "type": "string" }
+      },
+      "required": ["uid", "username", "role"]
+    },
+    "payslip": {
+      "title": "PublishedPayslip",
+      "description": "Payslip information for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "staffUsername": { "type": "string" },
+        "published": { "type": "boolean" },
+        "month": { "type": "number" },
+        "year": { "type": "number" }
+      },
+      "required": ["id", "staffUsername", "published", "month", "year"]
+    },
+    "bank": {
+      "title": "Bank",
+      "description": "Company bank account for transfer payments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "accountHolder": { "type": "string" },
+        "isDefault": { "type": "boolean" }
+      },
+      "required": ["id", "name", "accountNumber", "accountHolder", "isDefault"]
+    },
+    "client": {
+      "title": "Client",
+      "description": "Master client database for repeat orders in quotation, invoice, and kwitansi",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "company": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "createdAt"]
+    },
+    "invoice": {
+      "title": "Invoice",
+      "description": "Invoice documents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "invoiceNumber", "customerName", "date", "status"]
+    },
+    "quotation": {
+      "title": "Quotation",
+      "description": "Quotation documents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "quotationNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "quotationNumber", "customerName", "date", "status"]
+    },
+    "kwitansi": {
+      "title": "Kwitansi",
+      "description": "Receipt documents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kwitansiNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentFor": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "kwitansiNumber", "customerName", "amount", "paymentFor", "date"]
+    },
+    "kasbon": {
+      "title": "KasbonRequest",
+      "description": "Kasbon request from staff with admin approval workflow",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "staffUid": { "type": "string" },
+        "staffUsername": { "type": "string" },
+        "amount": { "type": "number" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "staffUid", "staffUsername", "amount", "reason", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "user",
+      "description": "User profiles"
+    },
+    "/payslips/{payslipId}": {
+      "schema": "payslip",
+      "description": "Published payslips"
+    },
+    "/banks/{bankId}": {
+      "schema": "bank",
+      "description": "Company bank accounts database"
+    },
+    "/clients/{clientId}": {
+      "schema": "client",
+      "description": "Client database"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": "invoice",
+      "description": "Invoice records"
+    },
+    "/quotations/{quotationId}": {
+      "schema": "quotation",
+      "description": "Quotation records"
+    },
+    "/kwitansi/{kwitansiId}": {
+      "schema": "kwitansi",
+      "description": "Kwitansi records"
+    },
+    "/kasbon_requests/{requestId}": {
+      "schema": "kasbon",
+      "description": "Staff kasbon advance requests"
+    }
+  }
+}

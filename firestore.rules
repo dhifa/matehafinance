@@ -1,0 +1,265 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Global Catch-All Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Globally Shared Validation Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(proj) {
+      return isSignedIn() && proj.ownerId == request.auth.uid;
+    }
+
+    function isSuperAdminEmail() {
+      return isSignedIn() && (
+        request.auth.token.email == "dhifahermawan@gmail.com" ||
+        request.auth.token.email.matches('^admin@.*')
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuperAdminEmail() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    function isFinanceOrAdmin() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "finance")
+      );
+    }
+
+    function isValidPayslip(ps) {
+      return ps.id is string
+        && ps.id.size() <= 128
+        && ps.staffUsername is string
+        && ps.staffUsername.size() > 0
+        && ps.staffUsername.size() <= 128
+        && ps.staffDisplayName is string
+        && ps.staffDisplayName.size() <= 250
+        && ps.staffJob is string
+        && ps.staffJob.size() <= 250
+        && ps.month is int
+        && ps.month >= 0
+        && ps.month <= 11
+        && ps.year is int
+        && ps.published is bool
+        && ps.customEarnings is list
+        && ps.customDeductions is list
+        && ps.createdAt is string
+        && ps.updatedAt is string;
+    }
+
+    function isValidProject(proj) {
+      return proj.id is string 
+        && proj.id.size() <= 128
+        && proj.name is string
+        && proj.name.size() > 0
+        && proj.name.size() <= 250;
+    }
+
+    // 3. Projects Collection securing Collaborate Access and Point B Additions
+    match /projects/{projectId} {
+      allow read: if true;
+      allow create: if isValidProject(incoming());
+      allow update: if isValidProject(incoming());
+      allow delete: if isSignedIn();
+    }
+    match /projects {
+      allow list: if true;
+    }
+
+    // 4. Users Collection untuk RBAC (Role-Based Access Control)
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId
+        || isAdmin()
+      );
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // 5. Settings Collection (Global configurations like staff roles templates)
+    match /settings/{settingsId} {
+      allow read: if true;
+      allow write: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // 6. Payslips Collection (Published/drafted payslips for staff)
+    match /payslips/{payslipId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.staffUsername == request.auth.token.email.split('@')[0] ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         resource.data.staffUsername == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username)
+      );
+      allow create, update: if isAdmin() && isValidPayslip(incoming());
+      allow delete: if isAdmin();
+    }
+    
+    // 7. Invoices Collection
+    function isValidInvoice(inv) {
+      return inv.id is string
+        && inv.id.size() <= 128
+        && inv.invoiceNumber is string
+        && inv.customerName is string
+        && inv.date is string
+        && inv.items is list
+        && inv.grandTotal is number
+        && inv.status is string
+        && (inv.status == "draft" || inv.status == "sent" || inv.status == "paid")
+        && inv.createdAt is string
+        && inv.termsAndConditions is string
+        && inv.selectedBanks is list;
+    }
+
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn();
+      allow create, update: if isFinanceOrAdmin() && isValidInvoice(incoming());
+      allow delete: if isFinanceOrAdmin();
+    }
+    
+    // 9. Banks Collection
+    function isValidBank(bank) {
+      return bank.id is string
+        && bank.id.size() <= 128
+        && bank.name is string
+        && bank.accountNumber is string
+        && bank.accountHolder is string
+        && bank.isDefault is bool;
+    }
+
+    match /banks/{bankId} {
+      allow read: if isSignedIn();
+      allow create, update: if isFinanceOrAdmin() && isValidBank(incoming());
+      allow delete: if isFinanceOrAdmin();
+    }
+
+    // 9b. Clients Collection (Master database for repeat customers)
+    function isValidClient(client) {
+      return client.id is string
+        && client.id.size() <= 128
+        && client.name is string
+        && client.name.size() > 0
+        && client.name.size() <= 200
+        && client.createdAt is string;
+    }
+
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow create, update: if isFinanceOrAdmin() && isValidClient(incoming());
+      allow delete: if isFinanceOrAdmin();
+    }
+    
+    // 10. Quotations Collection
+    function isValidQuotation(quo) {
+      return quo.id is string
+        && quo.id.size() <= 128
+        && quo.quotationNumber is string
+        && quo.customerName is string
+        && quo.date is string
+        && quo.validUntil is string
+        && quo.subject is string
+        && quo.items is list
+        && quo.grandTotal is number
+        && quo.status is string
+        && (quo.status == "draft" || quo.status == "sent" || quo.status == "accepted" || quo.status == "rejected")
+        && quo.createdAt is string
+        && quo.termsAndConditions is string;
+    }
+
+    match /quotations/{quotationId} {
+      allow read: if isSignedIn();
+      allow create, update: if isFinanceOrAdmin() && isValidQuotation(incoming());
+      allow delete: if isFinanceOrAdmin();
+    }
+
+    // 11. Kwitansi Collection
+    function isValidKwitansi(kwt) {
+      return kwt.id is string
+        && kwt.id.size() <= 128
+        && kwt.kwitansiNumber is string
+        && kwt.customerName is string
+        && kwt.amount is number
+        && kwt.paymentFor is string
+        && kwt.date is string
+        && kwt.createdAt is string;
+    }
+
+    match /kwitansi/{kwitansiId} {
+      allow read: if isSignedIn();
+      allow create, update: if isFinanceOrAdmin() && isValidKwitansi(incoming());
+      allow delete: if isFinanceOrAdmin();
+    }
+    
+    // 12. Kasbon Requests Collection
+    function isValidKasbon(req) {
+      return req.staffUid is string
+        && req.staffUid.size() <= 128
+        && req.staffUsername is string
+        && req.staffUsername.size() <= 128
+        && req.amount is number
+        && req.amount > 0
+        && req.reason is string
+        && req.reason.size() > 0
+        && req.reason.size() <= 500
+        && req.status is string
+        && (req.status == "pending" || req.status == "approved" || req.status == "rejected")
+        && req.createdAt is string;
+    }
+
+    match /kasbon_requests/{requestId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.staffUid == request.auth.uid ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         resource.data.staffUsername == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username) ||
+        resource.data.staffUsername == request.auth.token.email.split('@')[0]
+      );
+      allow create: if isSignedIn() 
+        && (incoming().staffUid == request.auth.uid || isAdmin())
+        && incoming().status == "pending"
+        && isValidKasbon(incoming());
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (resource.data.staffUid == request.auth.uid && incoming().status == "pending")
+      );
+      allow delete: if isAdmin();
+    }
+    
+    // 8. Shared Payslips Collection (Publicly shared payslips for viewing)
+    match /shared-payslips/{payslipId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // 7. Test Collection
+    match /test/{document=**} {
+      allow read: if true;
+    }
+  }
+}
