@@ -60,11 +60,13 @@ import {
   Minimize2,
   Maximize2,
   PanelTopClose,
-  PanelTopOpen
+  PanelTopOpen,
+  KeyRound
 } from "lucide-react";
 import UserManagement from "./components/UserManagement";
 import BackupExport from "./components/BackupExport";
 import StaffPayslipView from "./components/StaffPayslipView";
+import ChangePasswordModal from "./components/ChangePasswordModal";
 import logo from "/favicon.png";
 
 // Firebase operations
@@ -124,6 +126,7 @@ export default function App() {
     return false;
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState<boolean>(false);
 
   // Toggle Tab Minimize handler
   const handleToggleMinimizeTabs = (forced?: boolean) => {
@@ -1250,8 +1253,15 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                 </button>
               )}
 
-              {/* User email & role chip */}
-              <div className="hidden sm:flex items-center space-x-2 bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-slate-900 text-slate-300 font-mono text-[10px]">
+              {/* User email & role chip - Click to change password */}
+              <button
+                type="button"
+                onClick={() => setIsChangePasswordModalOpen(true)}
+                id="btn-trigger-change-password-desktop"
+                className="hidden sm:flex items-center space-x-2 bg-slate-950/80 hover:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-900 hover:border-slate-800 text-slate-300 font-mono text-[10px] transition cursor-pointer group"
+                title="Klik untuk ganti kata sandi akun Anda"
+              >
+                <KeyRound className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 transition" />
                 <span className="truncate max-w-[110px]">{user.email?.replace('@mateha.local', '')}</span>
                 <span className={`px-1.5 py-0.5 rounded-md font-extrabold uppercase text-[8px] ${
                   userProfile?.role === 'admin' 
@@ -1262,7 +1272,18 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                 }`}>
                   {userProfile?.role || 'staff'}
                 </span>
-              </div>
+              </button>
+
+              {/* Mobile Change Password Button */}
+              <button
+                type="button"
+                onClick={() => setIsChangePasswordModalOpen(true)}
+                id="btn-trigger-change-password-mobile"
+                className="sm:hidden p-2 bg-slate-900 border border-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 rounded-xl transition cursor-pointer"
+                title="Ganti Password Akun"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+              </button>
               
               {/* Logout button */}
               <button
@@ -1330,8 +1351,28 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                   })}
                 </div>
 
+                {/* Mobile User Profile & Change Password Bar */}
+                <div className="pt-2 border-t border-slate-850/60 flex items-center justify-between lg:hidden text-xs">
+                  <div className="flex items-center space-x-2 text-slate-400 text-[11px] font-mono">
+                    <span className="text-white font-bold">@{userProfile?.username || user.email?.replace('@mateha.local', '')}</span>
+                    <span className="text-slate-600">•</span>
+                    <span className="uppercase text-cyan-400 font-extrabold text-[9px]">{userProfile?.role || 'staff'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsChangePasswordModalOpen(true);
+                      handleToggleMinimizeTabs(true);
+                    }}
+                    className="flex items-center space-x-1 px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-800/40 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    <span>Ganti Password</span>
+                  </button>
+                </div>
+
                 {/* Quick Collapse Footer */}
-                <div className="pt-2 flex justify-center lg:hidden">
+                <div className="pt-1 flex justify-center lg:hidden">
                   <button
                     onClick={() => handleToggleMinimizeTabs(true)}
                     className="w-full py-1.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-850 rounded-xl text-[11px] font-bold text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
@@ -2327,6 +2368,14 @@ _Sistem Keuangan Otomatis Mateha Production_`;
           </div>
         )}
       </AnimatePresence>
+
+      {/* CHANGE PASSWORD MODAL */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
+        userProfile={userProfile}
+        onNotify={(msg, type) => triggerNotification(msg, type === "error" ? "error" : "success")}
+      />
 
     </div>
   );
