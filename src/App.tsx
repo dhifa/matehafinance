@@ -100,11 +100,26 @@ const ALL_NAV_TABS: NavTabItem[] = [
 export default function App() {
   // Auth state
   const [user, setUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    try {
+      const cached = localStorage.getItem("mateha_cached_profile");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
   const [authLoading, setAuthLoading] = useState(true);
 
   // Core Projects database (linked to Firestore)
-  const [privateProjects, setPrivateProjects] = useState<EventProject[]>([]);
+  const [privateProjects, setPrivateProjects] = useState<EventProject[]>(() => {
+    try {
+      const cached = localStorage.getItem("mateha_cached_projects");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_PROJECTS;
+  });
   const [publicProjects, setPublicProjects] = useState<EventProject[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const projects = useMemo(() => {
@@ -334,9 +349,19 @@ export default function App() {
         unsubUser = onSnapshot(allProjectsQuery, async (snapshot) => {
           const allList: EventProject[] = [];
           snapshot.forEach((snap) => allList.push(snap.data() as EventProject));
-          setPrivateProjects(allList);
-        }, (error) => {
-          console.error("Failed to load user projects:", error);
+          if (allList.length > 0) {
+            setPrivateProjects(allList);
+            try {
+              localStorage.setItem("mateha_cached_projects", JSON.stringify(allList));
+            } catch {}
+          }
+        }, (error: any) => {
+          const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
+          if (isQuota) {
+            console.warn("Firestore quota limit reached while loading projects. Using local cache.");
+          } else {
+            console.warn("Error loading user projects:", error?.message || error);
+          }
         });
       } catch (e) {
         console.error("Failed to construct or attach user projects query:", e);
@@ -371,8 +396,10 @@ export default function App() {
           const elevated = { ...data, role: "admin" as const };
           setDoc(docRef, elevated).catch(err => console.error("Elevation error:", err));
           setUserProfile(elevated);
+          try { localStorage.setItem("mateha_cached_profile", JSON.stringify(elevated)); } catch {}
         } else {
           setUserProfile(data);
+          try { localStorage.setItem("mateha_cached_profile", JSON.stringify(data)); } catch {}
         }
       } else {
         const fallbackProfile: UserProfile = {
@@ -383,9 +410,15 @@ export default function App() {
         // Save fallback profile safely to database
         setDoc(docRef, fallbackProfile).catch(err => console.error("Error setting fallback user profile:", err));
         setUserProfile(fallbackProfile);
+        try { localStorage.setItem("mateha_cached_profile", JSON.stringify(fallbackProfile)); } catch {}
       }
-    }, (error) => {
-      console.error("Failed to read user roles:", error);
+    }, (error: any) => {
+      const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
+      if (isQuota) {
+        console.warn("Firestore quota reached reading user profile. Using local cached profile.");
+      } else {
+        console.warn("Notice reading user profile:", error?.message || error);
+      }
     });
 
     return () => unsubscribe();
@@ -404,13 +437,22 @@ export default function App() {
           const data = docSnap.data();
           setStaffPresets(data.presets || []);
           setDbMembers(data.members || []);
+          try {
+            localStorage.setItem("mateha_cached_staff_presets", JSON.stringify(data.presets || []));
+            localStorage.setItem("mateha_cached_staff_members", JSON.stringify(data.members || []));
+          } catch {}
         } else {
           setStaffPresets([]);
           setDbMembers([]);
         }
       },
-      (error) => {
-        console.error("Failed to load staff presets in App.tsx:", error);
+      (error: any) => {
+        const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
+        if (isQuota) {
+          console.warn("Firestore quota limit reached for staff presets. Using local cache.");
+        } else {
+          console.warn("Notice reading staff presets:", error?.message || error);
+        }
       }
     );
     return () => unsubscribe();
@@ -429,10 +471,20 @@ export default function App() {
         snapshot.forEach((docSnap) => {
           list.push(docSnap.data() as UserProfile);
         });
-        setDbUsers(list);
+        if (list.length > 0) {
+          setDbUsers(list);
+          try {
+            localStorage.setItem("mateha_cached_users", JSON.stringify(list));
+          } catch {}
+        }
       },
-      (error) => {
-        console.error("Failed to load registered users in App.tsx:", error);
+      (error: any) => {
+        const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
+        if (isQuota) {
+          console.warn("Firestore quota limit reached for users. Using local cache.");
+        } else {
+          console.warn("Notice loading registered users:", error?.message || error);
+        }
       }
     );
     return () => unsubscribe();

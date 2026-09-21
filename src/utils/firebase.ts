@@ -6,11 +6,32 @@ import {
   updatePassword, 
   signOut 
 } from "firebase/auth";
-import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { 
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  getFirestore,
+  doc, 
+  getDocFromServer 
+} from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Initialize Firestore with persistent multi-tab cache so data is stored locally in IndexedDB
+// and queries remain available even if daily free tier read quota is reached
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  }, firebaseConfig.firestoreDatabaseId);
+} catch {
+  firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+}
+
+export const db = firestoreDb;
 export const auth = getAuth(app);
 
 export interface TeamMemberRegisterResult {
@@ -123,9 +144,12 @@ export async function syncUserAuthPassword(
 async function testConnection() {
   try {
     await getDocFromServer(doc(db, "test", "connection"));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("the client is offline")) {
-      console.error("Please check your Firebase configuration.");
+  } catch (error: any) {
+    const errMsg = error?.message || "";
+    if (errMsg.includes("the client is offline")) {
+      console.warn("Firestore client is offline, using offline cache.");
+    } else if (errMsg.includes("Quota") || errMsg.includes("quota") || errMsg.includes("resource-exhausted")) {
+      console.warn("Firestore free tier daily read quota active. Running in offline/cached mode.");
     }
   }
 }

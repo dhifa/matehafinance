@@ -168,9 +168,15 @@ const getRoleBadgeStyle = (color?: string, roleId?: string) => {
 };
 
 export default function UserManagement({ currentUserId, onNotify }: UserManagementProps) {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>(() => {
+    try {
+      const cached = localStorage.getItem("mateha_cached_users");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Custom Roles state (Admin can add/edit roles & customize feature permissions)
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
@@ -182,8 +188,14 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
 
   // Staff roles dropdown presets for RAB
-  const [presets, setPresets] = useState<StaffRolePreset[]>([]);
-  const [presetsLoading, setPresetsLoading] = useState(true);
+  const [presets, setPresets] = useState<StaffRolePreset[]>(() => {
+    try {
+      const cached = localStorage.getItem("mateha_cached_staff_presets");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+  const [presetsLoading, setPresetsLoading] = useState(false);
   const [newPresetRoleName, setNewPresetRoleName] = useState("");
   const [newDefaultNames, setNewDefaultNames] = useState("");
   const [newDefaultExpense, setNewDefaultExpense] = useState("");
@@ -316,12 +328,22 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         snapshot.forEach((doc) => {
           userList.push(doc.data() as UserProfile);
         });
-        setUsers(userList);
+        if (userList.length > 0) {
+          setUsers(userList);
+          try {
+            localStorage.setItem("mateha_cached_users", JSON.stringify(userList));
+          } catch {}
+        }
         setLoading(false);
       },
-      (error) => {
-        console.error("Failed to load users:", error);
-        onNotify("Gagal memuat daftar pengguna: " + error.message, "error");
+      (error: any) => {
+        const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
+        if (isQuota) {
+          console.warn("Firestore quota limit reached while loading users. Using local cache.");
+        } else {
+          console.warn("Error loading users:", error?.message || error);
+          onNotify("Gagal memuat daftar pengguna: " + error.message, "error");
+        }
         setLoading(false);
       }
     );
@@ -527,12 +549,16 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
   // Create new team member (Admin Only)
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    const fullName = addFullName.trim();
     const rawUname = addUsername.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "");
     const cleanPass = addPassword.trim();
-    const fullName = addFullName.trim();
 
+    if (!fullName) {
+      onNotify("Nama Lengkap / Panggilan anggota tim wajib diisi!", "error");
+      return;
+    }
     if (!rawUname) {
-      onNotify("Username anggota tim wajib diisi!", "error");
+      onNotify("Username login anggota tim wajib diisi!", "error");
       return;
     }
     if (rawUname.length < 3) {
@@ -542,6 +568,12 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
     if (cleanPass.length < 6) {
       onNotify("Password minimal harus 6 karakter!", "error");
       return;
+    }
+    if (addUseCustomEmail) {
+      if (!addCustomEmail.trim() || !addCustomEmail.includes("@")) {
+        onNotify("Format email kustom tidak valid! Harap masukkan alamat email yang benar.", "error");
+        return;
+      }
     }
 
     let finalEmail = `${rawUname}@mateha.local`;
@@ -556,7 +588,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         (u.email && u.email.toLowerCase() === finalEmail)
     );
     if (duplicate) {
-      onNotify(`Username "${rawUname}" sudah terdaftar sebagai ${duplicate.displayName || duplicate.username} (${duplicate.role})! Silakan edit data langsung dari tabel.`, "error");
+      onNotify(`Username "${rawUname}" sudah terdaftar sebagai ${duplicate.displayName || duplicate.username} (${duplicate.role})! Silakan gunakan username lain atau edit data di tabel.`, "error");
       return;
     }
 
@@ -1484,7 +1516,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                 </button>
               </div>
 
-              <form onSubmit={handleSaveUser} className="space-y-3.5 font-sans">
+              <form onSubmit={handleSaveUser} noValidate className="space-y-3.5 font-sans">
                 {/* 1. Nama Lengkap */}
                 <div>
                   <label className="block text-slate-400 font-semibold text-[10px] uppercase tracking-wider mb-1">
@@ -1728,8 +1760,8 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                         <input
                           type="number"
                           placeholder="50"
-                          step="5"
-                          min="1"
+                          step="any"
+                          min="0"
                           max="100"
                           value={editKasbonPercentLimit}
                           onChange={(e) => setEditKasbonPercentLimit(e.target.value)}
@@ -1757,7 +1789,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                         <input
                           type="number"
                           placeholder="Contoh: 2000000"
-                          step="50000"
+                          step="any"
                           min="0"
                           value={editKasbonFixedLimit}
                           onChange={(e) => setEditKasbonFixedLimit(e.target.value)}
@@ -1847,7 +1879,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                 </button>
               </div>
 
-              <form onSubmit={handleCreateUser} className="space-y-3.5 font-sans">
+              <form onSubmit={handleCreateUser} noValidate className="space-y-3.5 font-sans">
                 {/* 1. Nama Lengkap & Username */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -2186,8 +2218,8 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                         <input
                           type="number"
                           placeholder="50"
-                          step="5"
-                          min="1"
+                          step="any"
+                          min="0"
                           max="100"
                           value={addKasbonPercentLimit}
                           onChange={(e) => setAddKasbonPercentLimit(e.target.value)}
@@ -2215,7 +2247,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                         <input
                           type="number"
                           placeholder="Contoh: 2000000"
-                          step="50000"
+                          step="any"
                           min="0"
                           value={addKasbonFixedLimit}
                           onChange={(e) => setAddKasbonFixedLimit(e.target.value)}
@@ -2275,15 +2307,8 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                   </button>
                   <button
                     type="submit"
-                    disabled={
-                      creatingUser ||
-                      users.some(
-                        (u) =>
-                          u.username.toLowerCase() === addUsername.trim().toLowerCase() &&
-                          addUsername.trim().length > 0
-                      )
-                    }
-                    className="px-5 py-2 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-cyan-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer flex items-center space-x-2 shadow-lg shadow-cyan-500/10"
+                    disabled={creatingUser}
+                    className="px-5 py-2 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-cyan-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer flex items-center space-x-2 shadow-lg shadow-cyan-500/10 active:scale-95"
                   >
                     {creatingUser ? (
                       <>

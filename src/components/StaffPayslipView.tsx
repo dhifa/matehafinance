@@ -136,12 +136,24 @@ export default function StaffPayslipView({
   }, [currentUserProfile]);
 
   // Kasbon requests list
-  const [kasbonList, setKasbonList] = useState<KasbonRequest[]>([]);
-  const [loadingKasbon, setLoadingKasbon] = useState(true);
+  const [kasbonList, setKasbonList] = useState<KasbonRequest[]>(() => {
+    try {
+      const cached = localStorage.getItem("mateha_cached_kasbon");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+  const [loadingKasbon, setLoadingKasbon] = useState(false);
 
   // Published payslips collection state
-  const [publishedPayslips, setPublishedPayslips] = useState<Record<string, PublishedPayslip>>({});
-  const [loadingPayslips, setLoadingPayslips] = useState(true);
+  const [publishedPayslips, setPublishedPayslips] = useState<Record<string, PublishedPayslip>>(() => {
+    try {
+      const cached = localStorage.getItem("mateha_cached_payslips");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {};
+  });
+  const [loadingPayslips, setLoadingPayslips] = useState(false);
 
   // Reimburse Tab states
   const [reimburseFilterScope, setReimburseFilterScope] = useState<"current" | "all">("current");
@@ -192,7 +204,7 @@ export default function StaffPayslipView({
   // 1. Subscribe to published payslips
   useEffect(() => {
     setLoadingPayslips(true);
-    let q;
+    let q: any;
     if (isAdmin) {
       q = collection(db, "payslips");
     } else if (currentUserProfile?.username) {
@@ -204,16 +216,24 @@ export default function StaffPayslipView({
 
     const unsub = onSnapshot(
       q,
-      (snap) => {
+      (snap: any) => {
         const dict: Record<string, PublishedPayslip> = {};
-        snap.forEach((docSnap) => {
+        snap.forEach((docSnap: any) => {
           dict[docSnap.id] = docSnap.data() as PublishedPayslip;
         });
         setPublishedPayslips(dict);
+        try {
+          localStorage.setItem("mateha_cached_payslips", JSON.stringify(dict));
+        } catch {}
         setLoadingPayslips(false);
       },
-      (err) => {
-        console.error("Error loading payslips:", err);
+      (err: any) => {
+        const isQuota = err?.code === "resource-exhausted" || (err?.message || "").toLowerCase().includes("quota");
+        if (isQuota) {
+          console.warn("Firestore quota limit reached while loading payslips. Using local cache.");
+        } else {
+          console.warn("Error loading payslips:", err?.message || err);
+        }
         setLoadingPayslips(false);
       }
     );
@@ -223,7 +243,7 @@ export default function StaffPayslipView({
   // 2. Subscribe to kasbon requests
   useEffect(() => {
     setLoadingKasbon(true);
-    let q;
+    let q: any;
     if (isAdmin) {
       q = collection(db, "kasbon_requests");
     } else if (currentUserProfile?.uid) {
@@ -235,18 +255,26 @@ export default function StaffPayslipView({
 
     const unsub = onSnapshot(
       q,
-      (snap) => {
+      (snap: any) => {
         const list: KasbonRequest[] = [];
-        snap.forEach((docSnap) => {
+        snap.forEach((docSnap: any) => {
           list.push({ id: docSnap.id, ...(docSnap.data() as any) });
         });
         // Sort newest first
         list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setKasbonList(list);
+        try {
+          localStorage.setItem("mateha_cached_kasbon", JSON.stringify(list));
+        } catch {}
         setLoadingKasbon(false);
       },
-      (err) => {
-        console.error("Error loading kasbon requests:", err);
+      (err: any) => {
+        const isQuota = err?.code === "resource-exhausted" || (err?.message || "").toLowerCase().includes("quota");
+        if (isQuota) {
+          console.warn("Firestore quota limit reached while loading kasbon requests. Using local cache.");
+        } else {
+          console.warn("Error loading kasbon requests:", err?.message || err);
+        }
         setLoadingKasbon(false);
       }
     );
@@ -2013,9 +2041,9 @@ export default function StaffPayslipView({
                             ? `Contoh: ${Math.min(500000, maxAllowedKasbon)}`
                             : "Plafon belum tersedia"
                         }
-                        min="10000"
+                        min="0"
                         max={kasbonPlafondType === "unlimited" ? undefined : (maxAllowedKasbon > 0 ? maxAllowedKasbon : undefined)}
-                        step="5000"
+                        step="any"
                         disabled={kasbonPlafondType === "unlimited" ? false : maxAllowedKasbon <= 0}
                         value={kasbonAmount}
                         onChange={(e) => setKasbonAmount(e.target.value)}
