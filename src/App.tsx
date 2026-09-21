@@ -382,13 +382,57 @@ export default function App() {
       setUserProfile(null);
       return;
     }
+
+    const isOwnerEmail = user.email && (
+      user.email.toLowerCase() === "dhifahermawan@gmail.com" || 
+      user.email.toLowerCase().startsWith("admin@")
+    );
+
+    // Step 1: Instantly resolve from local cache or build immediate profile so the screen loads with 0ms delay
+    let resolvedProfile: UserProfile | null = null;
+    try {
+      const cachedProfStr = localStorage.getItem("mateha_cached_profile");
+      if (cachedProfStr) {
+        const parsed = JSON.parse(cachedProfStr);
+        if (parsed?.uid === user.uid || (parsed?.email && user.email && parsed.email.toLowerCase() === user.email.toLowerCase())) {
+          resolvedProfile = parsed;
+        }
+      }
+      if (!resolvedProfile) {
+        const cachedUsersStr = localStorage.getItem("mateha_cached_users");
+        if (cachedUsersStr) {
+          const userList = JSON.parse(cachedUsersStr);
+          if (Array.isArray(userList)) {
+            const found = userList.find((u: any) => 
+              u.uid === user.uid || 
+              (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()) ||
+              (u.username && user.email && user.email.startsWith(u.username.toLowerCase() + "@"))
+            );
+            if (found) {
+              resolvedProfile = found;
+            }
+          }
+        }
+      }
+    } catch {}
+
+    if (!resolvedProfile) {
+      const usernameFromEmail = user.email ? user.email.split("@")[0] : "Anggota Tim";
+      resolvedProfile = {
+        uid: user.uid,
+        username: usernameFromEmail,
+        displayName: user.displayName || usernameFromEmail,
+        email: user.email || undefined,
+        role: isOwnerEmail ? "admin" : "staff",
+      };
+    }
+
+    // Set immediate profile
+    setUserProfile(resolvedProfile);
+
+    // Step 2: Subscribe to Firestore snapshot for background synchronization
     const docRef = doc(db, "users", user.uid);
     const unsubscribe = onSnapshot(docRef, (snap) => {
-      const isOwnerEmail = user.email && (
-        user.email.toLowerCase() === "dhifahermawan@gmail.com" || 
-        user.email.toLowerCase().startsWith("admin@")
-      );
-
       if (snap.exists()) {
         const data = snap.data() as UserProfile;
         // Dynamically elevate owner to admin in Firestore database
@@ -404,7 +448,9 @@ export default function App() {
       } else {
         const fallbackProfile: UserProfile = {
           uid: user.uid,
-          username: user.email ? user.email.split("@")[0] : "Tamu Lapangan",
+          username: user.email ? user.email.split("@")[0] : "Anggota Tim",
+          displayName: user.displayName || (user.email ? user.email.split("@")[0] : "Anggota Tim"),
+          email: user.email || undefined,
           role: isOwnerEmail ? "admin" : "staff",
         };
         // Save fallback profile safely to database
