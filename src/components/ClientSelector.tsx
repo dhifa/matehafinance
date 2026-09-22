@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Client } from "../types";
-import { Users, Search, Plus, Building, Phone, ChevronDown, Check, X } from "lucide-react";
+import { Users, Search, Plus, Building, User, Phone, ChevronDown, Check, X } from "lucide-react";
+import { resolveClientDetails } from "../utils/clientHelper";
 
 interface ClientSelectorProps {
   clients: Client[];
@@ -31,7 +32,10 @@ export default function ClientSelector({
 
   const filtered = clients.filter((c) => {
     const q = search.toLowerCase();
+    const details = resolveClientDetails(c);
     return (
+      details.company.toLowerCase().includes(q) ||
+      details.pic.toLowerCase().includes(q) ||
       c.name.toLowerCase().includes(q) ||
       (c.company && c.company.toLowerCase().includes(q)) ||
       (c.phone && c.phone.includes(q))
@@ -58,7 +62,7 @@ export default function ClientSelector({
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari klien / perusahaan..."
+              placeholder="Cari perusahaan atau PIC..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 pl-8 pr-3 py-1.5 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
@@ -78,7 +82,14 @@ export default function ClientSelector({
           {/* List */}
           <div className="max-h-56 overflow-y-auto space-y-1 pr-0.5">
             {filtered.map((client) => {
-              const isSelected = selectedClientName && client.name.toLowerCase() === selectedClientName.toLowerCase();
+              const details = resolveClientDetails(client);
+              const isSelected = selectedClientName && (
+                details.company.toLowerCase() === selectedClientName.toLowerCase() ||
+                details.pic.toLowerCase() === selectedClientName.toLowerCase() ||
+                client.name.toLowerCase() === selectedClientName.toLowerCase()
+              );
+              const hasBoth = details.company && details.pic && details.company !== details.pic;
+
               return (
                 <button
                   key={client.id}
@@ -95,17 +106,20 @@ export default function ClientSelector({
                   }`}
                 >
                   <div className="truncate flex-1">
-                    <p className="font-semibold text-white truncate text-xs">{client.name}</p>
-                    {client.company && (
-                      <p className="text-[11px] text-cyan-400 truncate flex items-center gap-1 mt-0.5">
-                        <Building className="w-2.5 h-2.5 shrink-0" />
-                        <span>{client.company}</span>
+                    <p className="font-semibold text-white truncate text-xs flex items-center gap-1.5">
+                      <Building className="w-3 h-3 text-cyan-400 shrink-0" />
+                      <span className="truncate">{details.company || details.pic}</span>
+                    </p>
+                    {hasBoth && (
+                      <p className="text-[11px] text-slate-300 truncate flex items-center gap-1 mt-0.5">
+                        <User className="w-2.5 h-2.5 text-cyan-400/80 shrink-0" />
+                        <span>PIC: {details.pic}</span>
                       </p>
                     )}
-                    {client.phone && (
-                      <p className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    {details.phone && (
+                      <p className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
                         <Phone className="w-2.5 h-2.5 shrink-0" />
-                        <span>{client.phone}</span>
+                        <span>{details.phone}</span>
                       </p>
                     )}
                   </div>

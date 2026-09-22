@@ -7,6 +7,7 @@ import InvoicePreview from "./InvoicePreview";
 import BankManagementModal from "./BankManagementModal";
 import ClientManagement from "./ClientManagement";
 import ClientSelector from "./ClientSelector";
+import { resolveClientDetails } from "../utils/clientHelper";
 import { bulkExport } from "../utils/bulkExport";
 import { generateInvoicePdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
@@ -81,9 +82,10 @@ export default function InvoiceView() {
   }, []);
 
   const handleSelectClient = (client: Client) => {
-    setCustomerName(client.name);
-    if (client.phone) setCustomerPhone(client.phone);
-    if (client.company) setCustomerContact(client.company);
+    const details = resolveClientDetails(client);
+    setCustomerName(details.company || details.pic);
+    setCustomerContact(details.pic || "");
+    if (details.phone) setCustomerPhone(details.phone);
   };
 
   const toggleBank = (id: string) => {
@@ -281,15 +283,24 @@ export default function InvoiceView() {
         
         {/* If requested, save new client to database */}
         if (saveToClientDb && customerName.trim()) {
-          const clientExists = clients.some(c => c.name.toLowerCase() === customerName.trim().toLowerCase());
+          const clientExists = clients.some(c => {
+            const d = resolveClientDetails(c);
+            return (
+              d.company.toLowerCase() === customerName.trim().toLowerCase() ||
+              c.name.toLowerCase() === customerName.trim().toLowerCase() ||
+              (c.company && c.company.toLowerCase() === customerName.trim().toLowerCase())
+            );
+          });
           if (!clientExists) {
             const clientId = "client_" + Date.now();
             const clientDoc: Partial<Client> = {
               id: clientId,
               name: customerName.trim(),
+              company: customerName.trim(),
+              pic: customerContact.trim() || undefined,
               createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             };
-            if (customerContact.trim()) clientDoc.company = customerContact.trim();
             if (customerPhone.trim()) clientDoc.phone = customerPhone.trim();
             await setDoc(doc(db, "clients", clientId), sanitizeForFirestore(clientDoc));
           }
@@ -468,11 +479,12 @@ export default function InvoiceView() {
             </div>
             <input
               type="text"
-              placeholder="Contoh: PT Sumber Makmur / Bpk. Rudi"
+              placeholder="Contoh: PT Astra International / CV Maju Bersama"
               className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-white focus:border-blue-500 focus:outline-none"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
             />
+            <p className="text-[10px] text-slate-500 mt-1">Dicetak sebagai "Ditagihkan Kepada" (Nama Perusahaan / Instansi).</p>
             {customerName && !clients.some(c => c.name.toLowerCase() === customerName.toLowerCase()) && (
               <label className="flex items-center gap-1.5 mt-1.5 text-[11px] text-cyan-400/90 cursor-pointer">
                 <input
@@ -509,14 +521,15 @@ export default function InvoiceView() {
           </div>
 
           <div>
-            <label className="text-slate-400 font-semibold mb-1.5 block">Kontak Person (PIC / Instansi)</label>
+            <label className="text-slate-400 font-semibold mb-1.5 block">Kontak Person (Nama PIC Klien)</label>
             <input
               type="text"
-              placeholder="Nama PIC Klien"
+              placeholder="Contoh: Ibu Rina / Bpk. Hendra"
               className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-white focus:border-blue-500 focus:outline-none"
               value={customerContact}
               onChange={(e) => setCustomerContact(e.target.value)}
             />
+            <p className="text-[10px] text-slate-500 mt-1">Dicetak sebagai "PIC" di faktur invoice.</p>
           </div>
 
           <div>

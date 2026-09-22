@@ -72,13 +72,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
   // Navigation tabs: "rekap" (Tabel Rekap Semua Staff) vs "kasbon" (Pusat Persetujuan Kasbon)
   const [activeTab, setActiveTab] = useState<"rekap" | "kasbon">("rekap");
 
-  const [dbUsers, setDbUsers] = useState<UserProfile[]>(() => {
-    try {
-      const cached = localStorage.getItem("mateha_cached_users");
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return [];
-  });
+  const [dbUsers, setDbUsers] = useState<UserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
 
   // Month and Year selector states
@@ -92,14 +86,8 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
   const [filterRole, setFilterRole] = useState<string>("all");
 
   // Keep track of published payslips loaded from DB
-  const [publishedPayslips, setPublishedPayslips] = useState<Record<string, PublishedPayslip>>(() => {
-    try {
-      const cached = localStorage.getItem("mateha_cached_payslips");
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return {};
-  });
-  const [publishedLoading, setPublishedLoading] = useState(false);
+  const [publishedPayslips, setPublishedPayslips] = useState<Record<string, PublishedPayslip>>({});
+  const [publishedLoading, setPublishedLoading] = useState(true);
 
   // Detail & Quick Edit Modal State for a specific staff
   const [modalStaff, setModalStaff] = useState<UserProfile | null>(null);
@@ -114,14 +102,8 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
   const [adminPrintingStaff, setAdminPrintingStaff] = useState(false);
 
   // Kasbon requests subscription & state
-  const [kasbonList, setKasbonList] = useState<KasbonRequest[]>(() => {
-    try {
-      const cached = localStorage.getItem("mateha_cached_kasbon");
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return [];
-  });
-  const [loadingKasbon, setLoadingKasbon] = useState(false);
+  const [kasbonList, setKasbonList] = useState<KasbonRequest[]>([]);
+  const [loadingKasbon, setLoadingKasbon] = useState(true);
   const [kasbonStatusFilter, setKasbonStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [kasbonSearchQuery, setKasbonSearchQuery] = useState<string>("");
   const [copiedKasbonId, setCopiedKasbonId] = useState<string | null>(null);
@@ -140,18 +122,10 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
           list.push(doc.data() as UserProfile);
         });
         setDbUsers(list);
-        try {
-          localStorage.setItem("mateha_cached_users", JSON.stringify(list));
-        } catch {}
         setUsersLoading(false);
       },
-      (err: any) => {
-        const isQuota = err?.code === "resource-exhausted" || (err?.message || "").toLowerCase().includes("quota");
-        if (isQuota) {
-          console.warn("Firestore quota limit reached while loading users in Payslip. Using local cache.");
-        } else {
-          console.warn("Error loading users in Payslip:", err?.message || err);
-        }
+      (err) => {
+        console.error("Error loading users in Payslip:", err);
         setUsersLoading(false);
       }
     );
@@ -169,18 +143,10 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
           dict[doc.id] = doc.data() as PublishedPayslip;
         });
         setPublishedPayslips(dict);
-        try {
-          localStorage.setItem("mateha_cached_payslips", JSON.stringify(dict));
-        } catch {}
         setPublishedLoading(false);
       },
-      (err: any) => {
-        const isQuota = err?.code === "resource-exhausted" || (err?.message || "").toLowerCase().includes("quota");
-        if (isQuota) {
-          console.warn("Firestore quota limit reached while loading payslips in PayslipView. Using local cache.");
-        } else {
-          console.warn("Error loading payslips:", err?.message || err);
-        }
+      (err) => {
+        console.error("Error loading payslips:", err);
         setPublishedLoading(false);
       }
     );
@@ -198,18 +164,10 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
           list.push({ id: doc.id, ...doc.data() } as KasbonRequest);
         });
         setKasbonList(list);
-        try {
-          localStorage.setItem("mateha_cached_kasbon", JSON.stringify(list));
-        } catch {}
         setLoadingKasbon(false);
       },
-      (err: any) => {
-        const isQuota = err?.code === "resource-exhausted" || (err?.message || "").toLowerCase().includes("quota");
-        if (isQuota) {
-          console.warn("Firestore quota limit reached while loading kasbon in PayslipView. Using local cache.");
-        } else {
-          console.warn("Error loading kasbon in PayslipView:", err?.message || err);
-        }
+      (err) => {
+        console.error("Error loading kasbon in PayslipView:", err);
         setLoadingKasbon(false);
       }
     );

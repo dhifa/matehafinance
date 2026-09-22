@@ -15,6 +15,7 @@ import KwitansiPreview from "./KwitansiPreview";
 import BankManagementModal from "./BankManagementModal";
 import ClientManagement from "./ClientManagement";
 import ClientSelector from "./ClientSelector";
+import { resolveClientDetails } from "../utils/clientHelper";
 import { generateKwitansiItemPdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
 import { terbilang } from "../utils/numberToWords";
@@ -146,9 +147,12 @@ export default function KwitansiView() {
 
   // Autofill from chosen Client
   const handleSelectClient = (client: Client) => {
-    const displayName = client.company ? `${client.name} (${client.company})` : client.name;
+    const details = resolveClientDetails(client);
+    const displayName = details.company && details.pic && details.company !== details.pic
+      ? `${details.company} (PIC: ${details.pic})`
+      : (details.company || details.pic);
     setCustomerName(displayName);
-    triggerNotification(`Data klien "${client.name}" berhasil dipilih.`);
+    triggerNotification(`Data klien "${displayName}" berhasil dipilih.`);
   };
 
   // Autofill from chosen Invoice

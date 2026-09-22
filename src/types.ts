@@ -33,6 +33,7 @@ export interface Client {
   id: string;
   name: string;
   company?: string;
+  pic?: string;
   phone?: string;
   email?: string;
   address?: string;

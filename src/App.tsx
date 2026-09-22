@@ -97,30 +97,39 @@ const ALL_NAV_TABS: NavTabItem[] = [
   { id: "users", label: "Manajemen Staff", shortLabel: "Staff", icon: Users, roles: ["admin"] },
 ];
 
+// Local Storage resilient caching helpers for Firestore offline/quota fallback
+const loadCachedData = <T,>(key: string, fallback: T): T => {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const saveCachedData = (key: string, data: any) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+};
+
 export default function App() {
   // Auth state
   const [user, setUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    try {
-      const cached = localStorage.getItem("mateha_cached_profile");
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return null;
-  });
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   // Core Projects database (linked to Firestore)
-  const [privateProjects, setPrivateProjects] = useState<EventProject[]>(() => {
-    try {
-      const cached = localStorage.getItem("mateha_cached_projects");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_PROJECTS;
-  });
-  const [publicProjects, setPublicProjects] = useState<EventProject[]>([]);
+  const [privateProjects, setPrivateProjects] = useState<EventProject[]>(() => 
+    loadCachedData<EventProject[]>("mateha_cached_private_projects", [])
+  );
+  const [publicProjects, setPublicProjects] = useState<EventProject[]>(() => 
+    loadCachedData<EventProject[]>("mateha_cached_public_projects", [])
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const projects = useMemo(() => {
     // Merge, ensuring no duplicates based on ID
@@ -155,7 +164,22 @@ export default function App() {
   };
 
   // Custom Roles & feature permissions from settings
-  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>(() => 
+    loadCachedData<CustomRole[]>("mateha_cached_custom_roles", [])
+  );
+  const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(false);
+
+  const checkQuotaError = (err: unknown, context?: string) => {
+    const msg = String(err).toLowerCase();
+    const code = ((err as any)?.code || "").toLowerCase();
+    const isQuota = msg.includes("quota") || code === "resource-exhausted" || msg.includes("resource-exhausted");
+    if (isQuota) {
+      setIsQuotaExceeded(true);
+      console.warn(`[Firestore Quota] ${context ? context + ": " : ""}Free daily read quota reached. Using cached/local data.`);
+      return true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -163,10 +187,16 @@ export default function App() {
       (snap) => {
         if (snap.exists()) {
           const data = snap.data();
-          setCustomRoles(data.roles || []);
+          const roles = data.roles || [];
+          setCustomRoles(roles);
+          saveCachedData("mateha_cached_custom_roles", roles);
         }
       },
-      (err) => console.error("Error loading custom roles in App.tsx:", err)
+      (err) => {
+        if (!checkQuotaError(err, "Custom Roles")) {
+          console.error("Error loading custom roles in App.tsx:", err);
+        }
+      }
     );
     return () => unsub();
   }, []);
@@ -250,9 +280,15 @@ export default function App() {
   const [sharedPayslip, setSharedPayslip] = useState<PublishedPayslip | null>(null);
 
   // Global staff role presets loaded from /settings/staff_presets
-  const [staffPresets, setStaffPresets] = useState<StaffRolePreset[]>([]);
-  const [dbMembers, setDbMembers] = useState<string[]>([]);
-  const [dbUsers, setDbUsers] = useState<UserProfile[]>([]);
+  const [staffPresets, setStaffPresets] = useState<StaffRolePreset[]>(() => 
+    loadCachedData<StaffRolePreset[]>("mateha_cached_staff_presets", [])
+  );
+  const [dbMembers, setDbMembers] = useState<string[]>(() => 
+    loadCachedData<string[]>("mateha_cached_db_members", [])
+  );
+  const [dbUsers, setDbUsers] = useState<UserProfile[]>(() => 
+    loadCachedData<UserProfile[]>("mateha_cached_db_users", [])
+  );
 
   // New project inline form state
   const [isAddingProject, setIsAddingProject] = useState(false);
@@ -333,13 +369,18 @@ export default function App() {
           const publicList: EventProject[] = [];
           snapshot.forEach((snap) => publicList.push(snap.data() as EventProject));
           setPublicProjects(publicList);
+          saveCachedData("mateha_cached_public_projects", publicList);
         },
         (error) => {
-          console.warn("Public query failed or is not accessible:", error);
+          if (!checkQuotaError(error, "Public Projects")) {
+            console.warn("Public query failed or is not accessible:", error);
+          }
         }
       );
     } catch (e) {
-      console.error("Failed to construct or attach public query:", e);
+      if (!checkQuotaError(e, "Public Query Init")) {
+        console.error("Failed to construct or attach public query:", e);
+      }
     }
 
     if (user) {
@@ -349,22 +390,17 @@ export default function App() {
         unsubUser = onSnapshot(allProjectsQuery, async (snapshot) => {
           const allList: EventProject[] = [];
           snapshot.forEach((snap) => allList.push(snap.data() as EventProject));
-          if (allList.length > 0) {
-            setPrivateProjects(allList);
-            try {
-              localStorage.setItem("mateha_cached_projects", JSON.stringify(allList));
-            } catch {}
-          }
-        }, (error: any) => {
-          const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
-          if (isQuota) {
-            console.warn("Firestore quota limit reached while loading projects. Using local cache.");
-          } else {
-            console.warn("Error loading user projects:", error?.message || error);
+          setPrivateProjects(allList);
+          saveCachedData("mateha_cached_private_projects", allList);
+        }, (error) => {
+          if (!checkQuotaError(error, "User Projects")) {
+            console.error("Failed to load user projects:", error);
           }
         });
       } catch (e) {
-        console.error("Failed to construct or attach user projects query:", e);
+        if (!checkQuotaError(e, "User Projects Init")) {
+          console.error("Failed to construct or attach user projects query:", e);
+        }
       }
     } else {
         setPrivateProjects([]);
@@ -382,89 +418,54 @@ export default function App() {
       setUserProfile(null);
       return;
     }
-
-    const isOwnerEmail = user.email && (
-      user.email.toLowerCase() === "dhifahermawan@gmail.com" || 
-      user.email.toLowerCase().startsWith("admin@")
-    );
-
-    // Step 1: Instantly resolve from local cache or build immediate profile so the screen loads with 0ms delay
-    let resolvedProfile: UserProfile | null = null;
-    try {
-      const cachedProfStr = localStorage.getItem("mateha_cached_profile");
-      if (cachedProfStr) {
-        const parsed = JSON.parse(cachedProfStr);
-        if (parsed?.uid === user.uid || (parsed?.email && user.email && parsed.email.toLowerCase() === user.email.toLowerCase())) {
-          resolvedProfile = parsed;
-        }
-      }
-      if (!resolvedProfile) {
-        const cachedUsersStr = localStorage.getItem("mateha_cached_users");
-        if (cachedUsersStr) {
-          const userList = JSON.parse(cachedUsersStr);
-          if (Array.isArray(userList)) {
-            const found = userList.find((u: any) => 
-              u.uid === user.uid || 
-              (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()) ||
-              (u.username && user.email && user.email.startsWith(u.username.toLowerCase() + "@"))
-            );
-            if (found) {
-              resolvedProfile = found;
-            }
-          }
-        }
-      }
-    } catch {}
-
-    if (!resolvedProfile) {
-      const usernameFromEmail = user.email ? user.email.split("@")[0] : "Anggota Tim";
-      resolvedProfile = {
-        uid: user.uid,
-        username: usernameFromEmail,
-        displayName: user.displayName || usernameFromEmail,
-        email: user.email || undefined,
-        role: isOwnerEmail ? "admin" : "staff",
-      };
-    }
-
-    // Set immediate profile
-    setUserProfile(resolvedProfile);
-
-    // Step 2: Subscribe to Firestore snapshot for background synchronization
     const docRef = doc(db, "users", user.uid);
     const unsubscribe = onSnapshot(docRef, (snap) => {
+      const isOwnerEmail = user.email && (
+        user.email.toLowerCase() === "dhifahermawan@gmail.com" || 
+        user.email.toLowerCase().startsWith("admin@")
+      );
+
       if (snap.exists()) {
         const data = snap.data() as UserProfile;
         // Dynamically elevate owner to admin in Firestore database
         if (isOwnerEmail && data.role !== "admin") {
           const elevated = { ...data, role: "admin" as const };
-          setDoc(docRef, elevated).catch(err => console.error("Elevation error:", err));
+          setDoc(docRef, elevated).catch(err => {
+            if (!checkQuotaError(err, "Elevation")) console.error("Elevation error:", err);
+          });
           setUserProfile(elevated);
-          try { localStorage.setItem("mateha_cached_profile", JSON.stringify(elevated)); } catch {}
+          saveCachedData("mateha_cached_user_profile_" + user.uid, elevated);
         } else {
           setUserProfile(data);
-          try { localStorage.setItem("mateha_cached_profile", JSON.stringify(data)); } catch {}
+          saveCachedData("mateha_cached_user_profile_" + user.uid, data);
         }
       } else {
         const fallbackProfile: UserProfile = {
           uid: user.uid,
-          username: user.email ? user.email.split("@")[0] : "Anggota Tim",
-          displayName: user.displayName || (user.email ? user.email.split("@")[0] : "Anggota Tim"),
-          email: user.email || undefined,
+          username: user.email ? user.email.split("@")[0] : "Tamu Lapangan",
           role: isOwnerEmail ? "admin" : "staff",
         };
         // Save fallback profile safely to database
-        setDoc(docRef, fallbackProfile).catch(err => console.error("Error setting fallback user profile:", err));
+        setDoc(docRef, fallbackProfile).catch(err => {
+          if (!checkQuotaError(err, "Fallback Profile")) console.error("Error setting fallback user profile:", err);
+        });
         setUserProfile(fallbackProfile);
-        try { localStorage.setItem("mateha_cached_profile", JSON.stringify(fallbackProfile)); } catch {}
+        saveCachedData("mateha_cached_user_profile_" + user.uid, fallbackProfile);
       }
-    }, (error: any) => {
-      const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
-      if (isQuota) {
-        console.warn("Firestore quota reached reading user profile. Using local cached profile.");
-      } else {
-        console.warn("Notice reading user profile:", error?.message || error);
+    }, (error) => {
+      if (!checkQuotaError(error, "User Profile")) {
+        console.error("Failed to read user roles:", error);
       }
+      // Resilience fallback: Ensure user is not blocked on loading screen if Firestore quota is exceeded
+      const isOwnerEmail = user.email && (
+        user.email.toLowerCase() === "dhifahermawan@gmail.com" || 
+        user.email.toLowerCase().startsWith("admin@")
+      );
+      setUserProfile((prev) => prev || loadCachedData<UserProfile | null>("mateha_cached_user_profile_" + user.uid, {
+        uid: user.uid,
+        username: user.email ? user.email.split("@")[0] : "Pengguna",
+        role: isOwnerEmail ? "admin" : "staff",
+      }));
     });
 
     return () => unsubscribe();
@@ -481,23 +482,20 @@ export default function App() {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setStaffPresets(data.presets || []);
-          setDbMembers(data.members || []);
-          try {
-            localStorage.setItem("mateha_cached_staff_presets", JSON.stringify(data.presets || []));
-            localStorage.setItem("mateha_cached_staff_members", JSON.stringify(data.members || []));
-          } catch {}
+          const presets = data.presets || [];
+          const members = data.members || [];
+          setStaffPresets(presets);
+          setDbMembers(members);
+          saveCachedData("mateha_cached_staff_presets", presets);
+          saveCachedData("mateha_cached_db_members", members);
         } else {
           setStaffPresets([]);
           setDbMembers([]);
         }
       },
-      (error: any) => {
-        const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
-        if (isQuota) {
-          console.warn("Firestore quota limit reached for staff presets. Using local cache.");
-        } else {
-          console.warn("Notice reading staff presets:", error?.message || error);
+      (error) => {
+        if (!checkQuotaError(error, "Staff Presets")) {
+          console.error("Failed to load staff presets in App.tsx:", error);
         }
       }
     );
@@ -517,19 +515,12 @@ export default function App() {
         snapshot.forEach((docSnap) => {
           list.push(docSnap.data() as UserProfile);
         });
-        if (list.length > 0) {
-          setDbUsers(list);
-          try {
-            localStorage.setItem("mateha_cached_users", JSON.stringify(list));
-          } catch {}
-        }
+        setDbUsers(list);
+        saveCachedData("mateha_cached_db_users", list);
       },
-      (error: any) => {
-        const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
-        if (isQuota) {
-          console.warn("Firestore quota limit reached for users. Using local cache.");
-        } else {
-          console.warn("Notice loading registered users:", error?.message || error);
+      (error) => {
+        if (!checkQuotaError(error, "Registered Users")) {
+          console.error("Failed to load registered users in App.tsx:", error);
         }
       }
     );
@@ -1259,6 +1250,25 @@ _Sistem Keuangan Otomatis Mateha Production_`;
   // Standard Dashboard & sheets Workspace
   return (
     <div className="min-h-screen bg-[#080a0f] text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-white">
+      {/* FIRESTORE QUOTA EXCEEDED NOTICE BANNER */}
+      {isQuotaExceeded && (
+        <div className="bg-amber-950/70 border-b border-amber-600/40 px-4 py-2.5 text-amber-200 text-xs flex flex-wrap items-center justify-between gap-2 shadow-lg">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Batas Kuota Baca Harian Firestore Tercapai (Daily Free Read Quota Exceeded).</strong> Data lokal sementara ditampilkan. Kuota akan otomatis di-reset besok, atau Anda dapat meng-upgrade database di Firebase Console.
+            </span>
+          </div>
+          <a
+            href="https://console.firebase.google.com/project/gen-lang-client-0656486078/firestore/databases/ai-studio-d4b4d284-2843-494d-a06e-e71a92b31fd4/data?openUpgradeDialog=true"
+            target="_blank"
+            rel="noreferrer"
+            className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-1 rounded-lg text-[11px] whitespace-nowrap transition"
+          >
+            Buka Firebase Console / Upgrade
+          </a>
+        </div>
+      )}
       
       {/* GLOBAL HEAD NAVIGATION BAR WITH MINIMIZABLE TABS */}
       <nav id="navbar" className="border-b border-slate-900/80 bg-[#0c0e12]/95 backdrop-blur-xl sticky top-0 z-40 transition-all duration-200">

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Client } from "../types";
-import { collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from "firebase/firestore";
 import { db, sanitizeForFirestore } from "../utils/firebase";
+import { resolveClientDetails } from "../utils/clientHelper";
 import { 
   Users, 
   Plus, 
@@ -12,6 +13,8 @@ import {
   Mail, 
   MapPin, 
   Building, 
+  User,
+  ArrowUpDown,
   Check, 
   X, 
   MessageSquare,
@@ -40,8 +43,8 @@ export default function ClientManagement({
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form fields
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
+  const [company, setCompany] = useState(""); // Nama Perusahaan / Instansi / Event Organizer
+  const [pic, setPic] = useState("");         // Nama PIC / Kontak Person
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
@@ -65,8 +68,8 @@ export default function ClientManagement({
   if (isModal && !isOpen) return null;
 
   const resetForm = () => {
-    setName("");
     setCompany("");
+    setPic("");
     setPhone("");
     setEmail("");
     setAddress("");
@@ -77,10 +80,11 @@ export default function ClientManagement({
   };
 
   const handleStartEdit = (client: Client) => {
+    const details = resolveClientDetails(client);
     setEditingId(client.id);
-    setName(client.name || "");
-    setCompany(client.company || "");
-    setPhone(client.phone || "");
+    setCompany(details.company);
+    setPic(details.pic);
+    setPhone(details.phone || client.phone || "");
     setEmail(client.email || "");
     setAddress(client.address || "");
     setNotes(client.notes || "");
@@ -88,10 +92,37 @@ export default function ClientManagement({
     setErrorMsg("");
   };
 
+  const handleSwapFormFields = () => {
+    const tempCompany = company;
+    setCompany(pic);
+    setPic(tempCompany);
+  };
+
+  const handleQuickSwap = async (client: Client) => {
+    const details = resolveClientDetails(client);
+    const newCompany = details.pic;
+    const newPic = details.company;
+    try {
+      await updateDoc(doc(db, "clients", client.id), sanitizeForFirestore({
+        company: newCompany || undefined,
+        pic: newPic || undefined,
+        name: newCompany || newPic,
+        updatedAt: new Date().toISOString(),
+      }));
+      setSuccessMsg(`Posisi Perusahaan & PIC untuk "${newCompany || newPic}" berhasil ditukar!`);
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err: any) {
+      console.error("Gagal menukar posisi:", err);
+      setErrorMsg("Gagal menukar posisi: " + (err.message || "Error"));
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      setErrorMsg("Nama klien / kontak person wajib diisi.");
+    const primaryName = (company.trim() || pic.trim());
+    if (!primaryName) {
+      setErrorMsg("Mohon isi minimal Nama Perusahaan/Instansi atau Nama PIC.");
       return;
     }
 
@@ -102,12 +133,13 @@ export default function ClientManagement({
       const id = editingId || "client_" + Date.now();
       const clientData: Partial<Client> = {
         id,
-        name: name.trim(),
+        name: primaryName,
         createdAt: editingId ? (clients.find(c => c.id === editingId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       if (company.trim()) clientData.company = company.trim();
+      if (pic.trim()) clientData.pic = pic.trim();
       if (phone.trim()) clientData.phone = phone.trim();
       if (email.trim()) clientData.email = email.trim();
       if (address.trim()) clientData.address = address.trim();
@@ -142,9 +174,13 @@ export default function ClientManagement({
 
   const filteredClients = clients.filter((c) => {
     const query = searchQuery.toLowerCase();
+    const details = resolveClientDetails(c);
     return (
+      details.company.toLowerCase().includes(query) ||
+      details.pic.toLowerCase().includes(query) ||
       c.name.toLowerCase().includes(query) ||
       (c.company && c.company.toLowerCase().includes(query)) ||
+      (c.pic && c.pic.toLowerCase().includes(query)) ||
       (c.phone && c.phone.includes(query)) ||
       (c.email && c.email.toLowerCase().includes(query)) ||
       (c.notes && c.notes.toLowerCase().includes(query))
@@ -221,23 +257,21 @@ export default function ClientManagement({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-slate-300 font-semibold mb-1 block">
-                Nama Klien / PIC <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Contoh: Ibu Rina / Bpk. Hendra"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs text-white focus:border-cyan-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-slate-300 font-semibold mb-1 block">
-                Nama Perusahaan / Instansi / Event Organizer
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-slate-300 font-semibold block">
+                  Nama Perusahaan / Instansi / Event Organizer
+                </label>
+                {(company || pic) && (
+                  <button
+                    type="button"
+                    onClick={handleSwapFormFields}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer bg-cyan-950/40 hover:bg-cyan-900/50 px-2 py-0.5 rounded border border-cyan-800/50 transition"
+                    title="Tukar posisi antara Perusahaan dan PIC jika terbalik"
+                  >
+                    <ArrowUpDown className="w-3 h-3" /> Tukar Posisi
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 placeholder="Contoh: PT Astra International / Kemenperin"
@@ -245,6 +279,21 @@ export default function ClientManagement({
                 onChange={(e) => setCompany(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs text-white focus:border-cyan-500 focus:outline-none"
               />
+              <p className="text-[10px] text-slate-500 mt-1">Ditujukan untuk "Kepada Yth" di Quotation & "Ditagihkan Kepada" di Invoice.</p>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-300 font-semibold mb-1 block">
+                Nama Kontak Person (PIC Klien)
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Ibu Rina / Bpk. Hendra"
+                value={pic}
+                onChange={(e) => setPic(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs text-white focus:border-cyan-500 focus:outline-none"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">Ditujukan untuk "Up / PIC" di Quotation & Invoice.</p>
             </div>
 
             <div>
@@ -323,8 +372,10 @@ export default function ClientManagement({
       {/* Clients Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {filteredClients.map((c) => {
-          const cleanPhone = c.phone ? c.phone.replace(/[^0-9]/g, '') : '';
+          const details = resolveClientDetails(c);
+          const cleanPhone = details.phone ? details.phone.replace(/[^0-9]/g, '') : '';
           const waPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
+          const hasBoth = details.company && details.pic && details.company !== details.pic;
 
           return (
             <div
@@ -334,13 +385,14 @@ export default function ClientManagement({
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h4 className="font-bold text-white text-sm group-hover:text-cyan-400 transition">
-                      {c.name}
+                    <h4 className="font-bold text-white text-sm group-hover:text-cyan-400 transition flex items-center gap-1.5">
+                      <Building className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span>{details.company || details.pic}</span>
                     </h4>
-                    {c.company && (
-                      <p className="text-xs text-cyan-400/90 font-semibold flex items-center gap-1 mt-0.5">
-                        <Building className="w-3 h-3" />
-                        <span>{c.company}</span>
+                    {hasBoth && (
+                      <p className="text-xs text-slate-300 font-medium flex items-center gap-1 mt-1">
+                        <User className="w-3 h-3 text-cyan-400/80 shrink-0" />
+                        <span>PIC: <strong className="text-white">{details.pic}</strong></span>
                       </p>
                     )}
                   </div>
@@ -357,10 +409,10 @@ export default function ClientManagement({
                 </div>
 
                 <div className="space-y-1 text-xs text-slate-400">
-                  {c.phone && (
+                  {details.phone && (
                     <div className="flex items-center gap-2">
                       <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span className="font-mono">{c.phone}</span>
+                      <span className="font-mono">{details.phone}</span>
                       {cleanPhone && (
                         <a
                           href={`https://wa.me/${waPhone}`}
@@ -404,6 +456,17 @@ export default function ClientManagement({
                 </span>
 
                 <div className="flex items-center gap-1.5">
+                  {hasBoth && (
+                    <button
+                      type="button"
+                      onClick={() => handleQuickSwap(c)}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition cursor-pointer"
+                      title="Tukar Posisi Perusahaan & PIC (jika terbalik)"
+                    >
+                      <ArrowUpDown className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => handleStartEdit(c)}
@@ -415,7 +478,7 @@ export default function ClientManagement({
 
                   <button
                     type="button"
-                    onClick={() => handleDelete(c.id, c.name)}
+                    onClick={() => handleDelete(c.id, details.company || details.pic)}
                     className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
                     title="Hapus Klien"
                   >

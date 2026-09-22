@@ -60,14 +60,11 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, cleanPassword);
       
-      // Fast check if user status is nonaktif (with a 1.2s timeout so login is never blocked if network is slow/quota active)
+      // Check if user status is nonaktif
       try {
         const userDocRef = doc(db, "users", userCredential.user.uid);
-        const checkDocPromise = getDoc(userDocRef);
-        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1200));
-        const userSnap: any = await Promise.race([checkDocPromise, timeoutPromise]);
-        
-        if (userSnap && typeof userSnap.exists === "function" && userSnap.exists()) {
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
           const uData = userSnap.data();
           if (uData?.status === "nonaktif") {
             await signOut(auth);
@@ -83,7 +80,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
       setSuccessMsg("Berhasil masuk! Selamat bekerja...");
       setTimeout(() => {
         onSuccess();
-      }, 200);
+      }, 600);
     } catch (err: any) {
       console.error(err);
       

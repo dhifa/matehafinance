@@ -168,19 +168,23 @@ const getRoleBadgeStyle = (color?: string, roleId?: string) => {
 };
 
 export default function UserManagement({ currentUserId, onNotify }: UserManagementProps) {
-  const [users, setUsers] = useState<UserProfile[]>(() => {
+  const loadCached = <T,>(key: string, fallback: T): T => {
+    if (typeof window === "undefined") return fallback;
     try {
-      const cached = localStorage.getItem("mateha_cached_users");
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return [];
-  });
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const [users, setUsers] = useState<UserProfile[]>(() => loadCached<UserProfile[]>("mateha_cached_db_users", []));
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Custom Roles state (Admin can add/edit roles & customize feature permissions)
-  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
-  const [rolesLoading, setRolesLoading] = useState(true);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>(() => loadCached<CustomRole[]>("mateha_cached_custom_roles", DEFAULT_SYSTEM_ROLES));
+  const [rolesLoading, setRolesLoading] = useState(false);
   const [newCustomRoleName, setNewCustomRoleName] = useState("");
   const [newCustomRoleDesc, setNewCustomRoleDesc] = useState("");
   const [selectedRoleFeatures, setSelectedRoleFeatures] = useState<TabType[]>(["sheets", "staff-payslips"]);
@@ -188,13 +192,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
 
   // Staff roles dropdown presets for RAB
-  const [presets, setPresets] = useState<StaffRolePreset[]>(() => {
-    try {
-      const cached = localStorage.getItem("mateha_cached_staff_presets");
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return [];
-  });
+  const [presets, setPresets] = useState<StaffRolePreset[]>(() => loadCached<StaffRolePreset[]>("mateha_cached_staff_presets", []));
   const [presetsLoading, setPresetsLoading] = useState(false);
   const [newPresetRoleName, setNewPresetRoleName] = useState("");
   const [newDefaultNames, setNewDefaultNames] = useState("");
@@ -288,7 +286,12 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         setRolesLoading(false);
       },
       (error) => {
-        console.error("Failed to load custom roles:", error);
+        const msg = String(error).toLowerCase();
+        if (msg.includes("quota") || (error as any)?.code === "resource-exhausted") {
+          console.warn("[UserManagement] Firestore quota reached for custom_roles. Using default/cached roles.");
+        } else {
+          console.error("Failed to load custom roles:", error);
+        }
         setCustomRoles(DEFAULT_SYSTEM_ROLES);
         setRolesLoading(false);
       }
@@ -311,7 +314,12 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         setPresetsLoading(false);
       },
       (error) => {
-        console.error("Failed to load staff presets:", error);
+        const msg = String(error).toLowerCase();
+        if (msg.includes("quota") || (error as any)?.code === "resource-exhausted") {
+          console.warn("[UserManagement] Firestore quota reached for staff_presets. Using cached presets.");
+        } else {
+          console.error("Failed to load staff presets:", error);
+        }
         setPresetsLoading(false);
       }
     );
@@ -328,20 +336,15 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         snapshot.forEach((doc) => {
           userList.push(doc.data() as UserProfile);
         });
-        if (userList.length > 0) {
-          setUsers(userList);
-          try {
-            localStorage.setItem("mateha_cached_users", JSON.stringify(userList));
-          } catch {}
-        }
+        setUsers(userList);
         setLoading(false);
       },
-      (error: any) => {
-        const isQuota = error?.code === "resource-exhausted" || (error?.message || "").toLowerCase().includes("quota");
-        if (isQuota) {
-          console.warn("Firestore quota limit reached while loading users. Using local cache.");
+      (error) => {
+        const msg = String(error).toLowerCase();
+        if (msg.includes("quota") || (error as any)?.code === "resource-exhausted") {
+          console.warn("[UserManagement] Firestore quota reached for users collection. Using cached users.");
         } else {
-          console.warn("Error loading users:", error?.message || error);
+          console.error("Failed to load users:", error);
           onNotify("Gagal memuat daftar pengguna: " + error.message, "error");
         }
         setLoading(false);
@@ -549,16 +552,12 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
   // Create new team member (Admin Only)
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const fullName = addFullName.trim();
     const rawUname = addUsername.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "");
     const cleanPass = addPassword.trim();
+    const fullName = addFullName.trim();
 
-    if (!fullName) {
-      onNotify("Nama Lengkap / Panggilan anggota tim wajib diisi!", "error");
-      return;
-    }
     if (!rawUname) {
-      onNotify("Username login anggota tim wajib diisi!", "error");
+      onNotify("Username anggota tim wajib diisi!", "error");
       return;
     }
     if (rawUname.length < 3) {
@@ -568,12 +567,6 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
     if (cleanPass.length < 6) {
       onNotify("Password minimal harus 6 karakter!", "error");
       return;
-    }
-    if (addUseCustomEmail) {
-      if (!addCustomEmail.trim() || !addCustomEmail.includes("@")) {
-        onNotify("Format email kustom tidak valid! Harap masukkan alamat email yang benar.", "error");
-        return;
-      }
     }
 
     let finalEmail = `${rawUname}@mateha.local`;
@@ -588,7 +581,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         (u.email && u.email.toLowerCase() === finalEmail)
     );
     if (duplicate) {
-      onNotify(`Username "${rawUname}" sudah terdaftar sebagai ${duplicate.displayName || duplicate.username} (${duplicate.role})! Silakan gunakan username lain atau edit data di tabel.`, "error");
+      onNotify(`Username "${rawUname}" sudah terdaftar sebagai ${duplicate.displayName || duplicate.username} (${duplicate.role})! Silakan edit data langsung dari tabel.`, "error");
       return;
     }
 
@@ -1516,7 +1509,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                 </button>
               </div>
 
-              <form onSubmit={handleSaveUser} noValidate className="space-y-3.5 font-sans">
+              <form onSubmit={handleSaveUser} className="space-y-3.5 font-sans">
                 {/* 1. Nama Lengkap */}
                 <div>
                   <label className="block text-slate-400 font-semibold text-[10px] uppercase tracking-wider mb-1">
@@ -1879,7 +1872,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                 </button>
               </div>
 
-              <form onSubmit={handleCreateUser} noValidate className="space-y-3.5 font-sans">
+              <form onSubmit={handleCreateUser} className="space-y-3.5 font-sans">
                 {/* 1. Nama Lengkap & Username */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -2307,8 +2300,15 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                   </button>
                   <button
                     type="submit"
-                    disabled={creatingUser}
-                    className="px-5 py-2 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-cyan-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer flex items-center space-x-2 shadow-lg shadow-cyan-500/10 active:scale-95"
+                    disabled={
+                      creatingUser ||
+                      users.some(
+                        (u) =>
+                          u.username.toLowerCase() === addUsername.trim().toLowerCase() &&
+                          addUsername.trim().length > 0
+                      )
+                    }
+                    className="px-5 py-2 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-cyan-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer flex items-center space-x-2 shadow-lg shadow-cyan-500/10"
                   >
                     {creatingUser ? (
                       <>
