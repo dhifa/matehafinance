@@ -60,7 +60,7 @@ export default function KwitansiPreview({ kwitansi, invoice, onClose }: Kwitansi
       <div className="bg-white text-slate-900 p-8 rounded-2xl max-w-xl w-full shadow-2xl relative overflow-y-auto max-h-[92vh] border border-slate-200">
         
         {/* Actions header */}
-        <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-200">
+        <div className="no-print flex justify-between items-center pb-4 mb-4 border-b border-slate-200">
           <div className="flex items-center space-x-2">
             <button 
               onClick={handleDownloadPdf}
@@ -86,7 +86,7 @@ export default function KwitansiPreview({ kwitansi, invoice, onClose }: Kwitansi
           </button>
         </div>
 
-        <div className="p-4 text-center">
+        <div className="print-sheet p-4 text-center">
           <div className="flex items-center justify-between border-b-2 border-slate-300 pb-4 mb-6">
             <div className="text-left">
               <img src="/logo-mateha.png" alt="Logo Mateha" className="w-36 mb-1" />
@@ -106,7 +106,7 @@ export default function KwitansiPreview({ kwitansi, invoice, onClose }: Kwitansi
 
             <div className="flex items-start border-b border-slate-100 pb-2">
               <p className="w-40 text-slate-500 text-xs uppercase font-bold tracking-wider">Jumlah Uang</p>
-              <p className="flex-1 font-black text-slate-900 text-lg">: {formatRupiah(amount)}</p>
+              <p className="flex-1 font-black text-slate-900 text-lg font-mono">: {formatRupiah(amount)}</p>
             </div>
 
             <div className="flex items-start border-b border-slate-100 pb-2">
@@ -116,7 +116,7 @@ export default function KwitansiPreview({ kwitansi, invoice, onClose }: Kwitansi
 
             <div className="flex items-start border-b border-slate-100 pb-2">
               <p className="w-40 text-slate-500 text-xs uppercase font-bold tracking-wider">Untuk Pembayaran</p>
-              <p className="flex-1 font-medium text-slate-800">: {paymentFor}</p>
+              <p className="flex-1 font-medium text-slate-800 leading-relaxed">: {paymentFor}</p>
             </div>
 
             <div className="flex items-start border-b border-slate-100 pb-2">
@@ -125,12 +125,12 @@ export default function KwitansiPreview({ kwitansi, invoice, onClose }: Kwitansi
             </div>
           </div>
 
-          <div className="bg-emerald-50 border-2 border-dashed border-emerald-500/60 rounded-xl p-3.5 mb-6 text-emerald-800 font-bold text-xs flex items-center justify-between">
+          <div className="bg-emerald-50 border-2 border-dashed border-emerald-500/60 rounded-xl p-3.5 mb-6 text-emerald-800 font-bold text-xs flex items-center justify-between print-avoid-break">
             <span>STATUS: LUNAS / VERIFIED</span>
             <span className="font-mono">{formattedDate}</span>
           </div>
 
-          <div className="flex justify-between items-end mt-8 pt-4">
+          <div className="flex justify-between items-end mt-8 pt-4 print-avoid-break">
             <div className="text-left text-[11px] text-slate-500 font-sans space-y-0.5 leading-snug">
               <p className="font-extrabold text-slate-800 font-mono">MATEHA PRODUCTION</p>
               <p>Komplek BTN No.6A, Sekejati, Kec. Buahbatu</p>
