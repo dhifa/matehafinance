@@ -54,6 +54,7 @@ export default function BankManagementModal({
   const [isDefault, setIsDefault] = useState(banks.length === 0);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -135,14 +136,13 @@ export default function BankManagementModal({
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus rekening ${name}?`)) {
-      try {
-        await deleteDoc(doc(db, "banks", id));
-        if (editingId === id) resetForm();
-      } catch (err: any) {
-        alert("Gagal menghapus: " + err.message);
-      }
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "banks", id));
+      if (editingId === id) resetForm();
+      setConfirmDeleteId(null);
+    } catch (err: any) {
+      console.error("Gagal menghapus rekening:", err);
     }
   };
 
@@ -390,14 +390,34 @@ export default function BankManagementModal({
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(b.id, b.name)}
-                    className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-                    title="Hapus Rekening"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {confirmDeleteId === b.id ? (
+                    <div className="flex items-center gap-1 bg-rose-950/80 border border-rose-800/80 px-2 py-1 rounded-lg text-[10px]">
+                      <span className="text-rose-300 font-semibold">Hapus?</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(b.id)}
+                        className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer"
+                      >
+                        Ya
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(b.id)}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                      title="Hapus Rekening"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

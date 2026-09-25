@@ -4,12 +4,21 @@ import { generateInvoicePdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
 import { formatDateString } from "../utils/date";
 import { terbilang } from "../utils/numberToWords";
-import { Download, Printer, X, FileText, Loader2, Copy, Check } from "lucide-react";
+import { Download, Printer, X, FileText, Loader2, Copy, Check, UserCheck, Trash2 } from "lucide-react";
 import { paginateDocumentItems } from "../utils/documentPagination";
 
-export default function InvoicePreview({ invoice, onClose }: { invoice: Invoice, onClose: () => void }) {
+export default function InvoicePreview({ 
+  invoice, 
+  onClose,
+  onDelete
+}: { 
+  invoice: Invoice; 
+  onClose: () => void;
+  onDelete?: (invoice: Invoice) => void;
+}) {
   const [isExporting, setIsExporting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showClientApproval, setShowClientApproval] = useState<boolean>(!!invoice.showClientApproval);
 
   const formattedDate = formatDateString(invoice.date);
   const formattedDueDate = invoice.dueDate ? formatDateString(invoice.dueDate) : "-";
@@ -20,7 +29,11 @@ export default function InvoicePreview({ invoice, onClose }: { invoice: Invoice,
   const exportPdf = async () => {
     setIsExporting(true);
     try {
-      const blob = await generateInvoicePdfBlob(invoice);
+      const activeInvoice: Invoice = {
+        ...invoice,
+        showClientApproval,
+      };
+      const blob = await generateInvoicePdfBlob(activeInvoice);
       const cleanFileName = `Invoice_${invoice.invoiceNumber.replace(/\//g, '_')}_${invoice.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       saveAs(blob, cleanFileName);
     } catch (err) {
@@ -90,6 +103,20 @@ export default function InvoicePreview({ invoice, onClose }: { invoice: Invoice,
 
           <div className="flex items-center space-x-2">
             <button
+              onClick={() => setShowClientApproval(!showClientApproval)}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                showClientApproval 
+                  ? "bg-blue-950/90 border-blue-500/80 text-blue-300" 
+                  : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400"
+              }`}
+              title="Aktifkan atau sembunyikan kolom pengesahan klien secara dinamis"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Approval Klien:</span>
+              <span>{showClientApproval ? "ON" : "OFF"}</span>
+            </button>
+
+            <button
               onClick={copySummaryForWA}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer"
               title="Salin ringkasan teks untuk WhatsApp"
@@ -133,6 +160,17 @@ export default function InvoicePreview({ invoice, onClose }: { invoice: Invoice,
                 </>
               )}
             </button>
+
+            {onDelete && (
+              <button
+                onClick={() => onDelete(invoice)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-950 border border-slate-700 hover:border-rose-700 text-slate-400 hover:text-rose-400 text-xs font-semibold transition cursor-pointer"
+                title="Hapus Invoice Ini"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">Hapus</span>
+              </button>
+            )}
 
             <button
               onClick={onClose}
@@ -392,24 +430,54 @@ export default function InvoicePreview({ invoice, onClose }: { invoice: Invoice,
 
                       {/* TANDA TANGAN */}
                       <div className="pt-2 text-xs print-avoid-break">
-                        <div className="flex justify-between items-end">
-                          <div className="text-slate-400 text-[10px] space-y-0.5">
-                            <p className="font-mono">Dokumen Resmi Mateha Production</p>
-                            <p>Dicetak pada: {new Date().toLocaleDateString('id-ID')}</p>
-                          </div>
-
-                          <div className="text-center w-60">
-                            <p className="text-xs text-slate-600 mb-1">Bandung, {formattedDate}</p>
-                            <p className="text-xs font-semibold text-slate-800 mb-2">Hormat Kami,</p>
-                            <div className="relative h-20 flex items-center justify-center">
-                              <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-36 max-h-20 object-contain mx-auto" />
+                        {showClientApproval ? (
+                          <div className="flex justify-between items-end gap-6 pt-1">
+                            {/* KOLOM APPROVAL KLIEN */}
+                            <div className="text-center w-56 sm:w-64">
+                              <p className="text-xs text-slate-600 mb-1">Disetujui & Diterima Oleh,</p>
+                              <p className="text-xs font-bold text-slate-900 mb-2">Pihak Klien / Pemesan</p>
+                              <div className="h-20" />
+                              <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
+                                {invoice.clientApprovalName || invoice.customerContact || "( ................................... )"}
+                              </p>
+                              <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                                {invoice.clientApprovalTitle || invoice.customerName || "Klien / Pemesan"}
+                              </p>
                             </div>
-                            <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
-                              Dhifa Aksa Hermawan
-                            </p>
-                            <p className="text-[11px] text-slate-600 font-medium mt-0.5">CEO Mateha Production</p>
+
+                            {/* KOLOM TANDA TANGAN MATEHA */}
+                            <div className="text-center w-56 sm:w-64">
+                              <p className="text-xs text-slate-600 mb-1">Bandung, {formattedDate}</p>
+                              <p className="text-xs font-bold text-slate-900 mb-2">Hormat Kami,</p>
+                              <div className="relative h-20 flex items-center justify-center">
+                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-36 max-h-20 object-contain mx-auto" />
+                              </div>
+                              <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
+                                Dhifa Aksa Hermawan
+                              </p>
+                              <p className="text-[11px] text-slate-600 font-medium mt-0.5">CEO Mateha Production</p>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="flex justify-between items-end">
+                            <div className="text-slate-400 text-[10px] space-y-0.5">
+                              <p className="font-mono">Dokumen Resmi Mateha Production</p>
+                              <p>Dicetak pada: {new Date().toLocaleDateString('id-ID')}</p>
+                            </div>
+
+                            <div className="text-center w-60">
+                              <p className="text-xs text-slate-600 mb-1">Bandung, {formattedDate}</p>
+                              <p className="text-xs font-semibold text-slate-800 mb-2">Hormat Kami,</p>
+                              <div className="relative h-20 flex items-center justify-center">
+                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-36 max-h-20 object-contain mx-auto" />
+                              </div>
+                              <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
+                                Dhifa Aksa Hermawan
+                              </p>
+                              <p className="text-[11px] text-slate-600 font-medium mt-0.5">CEO Mateha Production</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </>
                   )}

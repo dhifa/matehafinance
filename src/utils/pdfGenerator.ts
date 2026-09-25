@@ -335,21 +335,46 @@ export const generateQuotationPdfBlob = async (quotation: Quotation): Promise<Bl
         <!-- BOTTOM SECTION (PINNED TO BOTTOM) -->
         <div style="position: relative; z-index: 10; padding-top: 6px;">
           ${page.isLastPage ? `
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
-              <tr>
-                <td style="width: 60%; vertical-align: bottom; color: #94a3b8; font-size: 9px; font-family: monospace;">
-                  Dokumen Resmi Mateha Production<br/>
-                  Bandung - Jawa Barat
-                </td>
-                <td style="width: 40%; vertical-align: bottom; text-align: center;">
-                  <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
-                  <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
-                  <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
-                  <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
-                  <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
-                </td>
-              </tr>
-            </table>
+            ${quotation.showClientApproval ? `
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-right: 15px;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Disetujui & Diterima Oleh,</p>
+                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Pihak Klien / Pemesan</p>
+                    <div style="height: 52px;"></div>
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">
+                      ${quotation.clientApprovalName || quotation.customerContact || '( ................................... )'}
+                    </p>
+                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">
+                      ${quotation.clientApprovalTitle || quotation.customerName || 'Klien / Pemesan'}
+                    </p>
+                  </td>
+                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-left: 15px;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
+                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
+                    <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
+                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
+                  </td>
+                </tr>
+              </table>
+            ` : `
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
+                <tr>
+                  <td style="width: 60%; vertical-align: bottom; color: #94a3b8; font-size: 9px; font-family: monospace;">
+                    Dokumen Resmi Mateha Production<br/>
+                    Bandung - Jawa Barat
+                  </td>
+                  <td style="width: 40%; vertical-align: bottom; text-align: center;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
+                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
+                    <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
+                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
+                  </td>
+                </tr>
+              </table>
+            `}
           ` : ''}
 
           <!-- FOOTER DOKUMEN -->
@@ -549,21 +574,46 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
         <!-- BOTTOM SECTION (PINNED TO BOTTOM) -->
         <div style="position: relative; z-index: 10; padding-top: 6px;">
           ${page.isLastPage ? `
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
-              <tr>
-                <td style="width: 60%; vertical-align: bottom; color: #94a3b8; font-size: 9px; font-family: monospace;">
-                  Dokumen Resmi Mateha Production<br/>
-                  Bandung - Jawa Barat
-                </td>
-                <td style="width: 40%; vertical-align: bottom; text-align: center;">
-                  <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
-                  <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
-                  <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
-                  <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
-                  <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
-                </td>
-              </tr>
-            </table>
+            ${invoice.showClientApproval ? `
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-right: 15px;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Disetujui & Diterima Oleh,</p>
+                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Pihak Klien / Pemesan</p>
+                    <div style="height: 52px;"></div>
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">
+                      ${invoice.clientApprovalName || invoice.customerContact || '( ................................... )'}
+                    </p>
+                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">
+                      ${invoice.clientApprovalTitle || invoice.customerName || 'Klien / Pemesan'}
+                    </p>
+                  </td>
+                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-left: 15px;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
+                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
+                    <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
+                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
+                  </td>
+                </tr>
+              </table>
+            ` : `
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
+                <tr>
+                  <td style="width: 60%; vertical-align: bottom; color: #94a3b8; font-size: 9px; font-family: monospace;">
+                    Dokumen Resmi Mateha Production<br/>
+                    Bandung - Jawa Barat
+                  </td>
+                  <td style="width: 40%; vertical-align: bottom; text-align: center;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
+                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
+                    <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
+                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
+                  </td>
+                </tr>
+              </table>
+            `}
           ` : ''}
 
           <!-- FOOTER DOKUMEN -->

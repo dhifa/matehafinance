@@ -66,6 +66,10 @@ export interface Quotation {
   selectedBanks: Bank[];
   termsAndConditions: string;
   notes?: string;
+  // Approval Client
+  showClientApproval?: boolean;
+  clientApprovalName?: string;
+  clientApprovalTitle?: string;
 }
 
 export interface InvoiceItem {
@@ -92,6 +96,10 @@ export interface Invoice {
   selectedBanks: Bank[];
   termsAndConditions: string;
   notes?: string;
+  // Approval Client
+  showClientApproval?: boolean;
+  clientApprovalName?: string;
+  clientApprovalTitle?: string;
 }
 
 export interface SharingRatio {

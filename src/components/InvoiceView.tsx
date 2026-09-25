@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "firebase/firestore";
 import { db, sanitizeForFirestore } from "../utils/firebase";
 import { Invoice, InvoiceItem, formatRupiah, Bank, Client } from "../types";
-import { Plus, Trash2, Save, FileText, Eye, Download, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users } from "lucide-react";
+import { Plus, Trash2, Save, FileText, Eye, Download, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users, UserCheck } from "lucide-react";
 import InvoicePreview from "./InvoicePreview";
 import BankManagementModal from "./BankManagementModal";
 import ClientManagement from "./ClientManagement";
@@ -14,6 +14,7 @@ import { saveAs } from "file-saver";
 
 export default function InvoiceView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmInv, setDeleteConfirmInv] = useState<Invoice | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -39,6 +40,11 @@ export default function InvoiceView() {
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [termsAndConditions, setTermsAndConditions] = useState("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
   const [saveToClientDb, setSaveToClientDb] = useState(false);
+
+  // Client Approval state
+  const [showClientApproval, setShowClientApproval] = useState(false);
+  const [clientApprovalName, setClientApprovalName] = useState("");
+  const [clientApprovalTitle, setClientApprovalTitle] = useState("");
 
   // New item draft input
   const [newItem, setNewItem] = useState({ description: "", qty: 1, price: 0 });
@@ -197,10 +203,20 @@ export default function InvoiceView() {
     cancelEdit();
   };
 
-  const handleDeleteSingle = async (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus invoice ini?")) {
-      await deleteDoc(doc(db, "invoices", id));
-      if (editModeId === id) cancelEdit();
+  const handleDeleteSingle = (inv: Invoice) => {
+    setDeleteConfirmInv(inv);
+  };
+
+  const executeDeleteSingle = async () => {
+    if (!deleteConfirmInv) return;
+    try {
+      await deleteDoc(doc(db, "invoices", deleteConfirmInv.id));
+      if (editModeId === deleteConfirmInv.id) cancelEdit();
+      if (selectedInvoice?.id === deleteConfirmInv.id) setSelectedInvoice(null);
+    } catch (err) {
+      console.error("Error deleting invoice:", err);
+    } finally {
+      setDeleteConfirmInv(null);
     }
   };
 
@@ -216,6 +232,9 @@ export default function InvoiceView() {
     setItems(inv.items ? JSON.parse(JSON.stringify(inv.items)) : []);
     setSelectedBankIds(inv.selectedBanks ? inv.selectedBanks.map(b => b.id) : []);
     setTermsAndConditions(inv.termsAndConditions || "Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
+    setShowClientApproval(!!inv.showClientApproval);
+    setClientApprovalName(inv.clientApprovalName || "");
+    setClientApprovalTitle(inv.clientApprovalTitle || "");
     setEditingItemIndex(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -232,6 +251,9 @@ export default function InvoiceView() {
     setDueDate("");
     setSelectedBankIds([]);
     setTermsAndConditions("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
+    setShowClientApproval(false);
+    setClientApprovalName("");
+    setClientApprovalTitle("");
     setEditingItemIndex(null);
   };
 
@@ -255,7 +277,10 @@ export default function InvoiceView() {
           items,
           grandTotal,
           selectedBanks,
-          termsAndConditions: termsAndConditions.trim()
+          termsAndConditions: termsAndConditions.trim(),
+          showClientApproval: !!showClientApproval,
+          clientApprovalName: clientApprovalName.trim() || undefined,
+          clientApprovalTitle: clientApprovalTitle.trim() || undefined,
         });
         alert(`Perubahan invoice ${editingInvoiceNumber || ""} berhasil disimpan!`);
         cancelEdit();
@@ -277,6 +302,9 @@ export default function InvoiceView() {
           createdAt: new Date().toISOString(),
           selectedBanks,
           termsAndConditions: termsAndConditions.trim(),
+          showClientApproval: !!showClientApproval,
+          clientApprovalName: clientApprovalName.trim() || undefined,
+          clientApprovalTitle: clientApprovalTitle.trim() || undefined,
         };
         await setDoc(doc(db, "invoices", id), sanitizeForFirestore(newInvoice));
         alert(`Faktur Invoice ${invoiceNumber} berhasil dibuat!`);
@@ -348,7 +376,13 @@ export default function InvoiceView() {
 
   return (
     <div className="text-white space-y-6">
-      {selectedInvoice && <InvoicePreview invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />}
+      {selectedInvoice && (
+        <InvoicePreview 
+          invoice={selectedInvoice} 
+          onClose={() => setSelectedInvoice(null)} 
+          onDelete={(inv) => setDeleteConfirmInv(inv)}
+        />
+      )}
       
       {/* Bank Management Modal */}
       <BankManagementModal
@@ -369,6 +403,38 @@ export default function InvoiceView() {
         onClose={() => setIsClientModalOpen(false)}
         onSelectClient={handleSelectClient}
       />
+
+      {/* Single Invoice Delete Confirmation Modal */}
+      {deleteConfirmInv && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-3">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold mb-1.5 text-white">Hapus Invoice</h3>
+            <p className="text-slate-400 text-xs mb-5 leading-relaxed">
+              Apakah Anda yakin ingin menghapus invoice <strong className="text-white font-mono">{deleteConfirmInv.invoiceNumber}</strong> ({deleteConfirmInv.customerName})? Dokumen tagihan ini akan dihilangkan secara permanen.
+            </p>
+            <div className="flex gap-2.5 justify-end">
+              <button 
+                type="button" 
+                onClick={() => setDeleteConfirmInv(null)} 
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                onClick={executeDeleteSingle} 
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950 cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -840,6 +906,107 @@ export default function InvoiceView() {
           )}
         </div>
 
+        {/* PENGATURAN APPROVAL KLIEN */}
+        <div className="bg-slate-950/70 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-blue-950/60 border border-blue-800/50 text-blue-400">
+                <UserCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Approval / Lembar Pengesahan Klien
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Tampilkan kolom tanda tangan persetujuan / tanda terima klien di invoice
+                </p>
+              </div>
+            </div>
+
+            <label className="relative inline-flex items-center cursor-pointer self-start sm:self-auto">
+              <input
+                type="checkbox"
+                checked={showClientApproval}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setShowClientApproval(val);
+                  if (val && !clientApprovalName && customerContact) {
+                    setClientApprovalName(customerContact);
+                    if (!clientApprovalTitle) setClientApprovalTitle("PIC / Penanggung Jawab");
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <span className="ml-2.5 text-xs font-semibold text-slate-300">
+                {showClientApproval ? "Aktif (Ditampilkan)" : "Nonaktif (Sembunyikan)"}
+              </span>
+            </label>
+          </div>
+
+          {showClientApproval && (
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-slate-300 font-semibold">Identitas Penandatangan Klien:</span>
+                {customerContact && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClientApprovalName(customerContact);
+                      if (!clientApprovalTitle) setClientApprovalTitle("PIC / Penanggung Jawab");
+                    }}
+                    className="text-[11px] text-blue-400 hover:text-blue-300 bg-blue-950/60 border border-blue-800/60 hover:border-blue-700 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Check className="w-3 h-3" />
+                    <span>Sama dengan PIC ({customerContact})</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold mb-1 block">
+                    Nama Approval / Penandatangan Klien
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={customerContact || "Contoh: Bpk. Bambang Sutrisno / Ibu Rina"}
+                    value={clientApprovalName}
+                    onChange={(e) => setClientApprovalName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs text-white focus:border-blue-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Bisa sama dengan PIC atau nama pejabat/atasan klien yang berbeda.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold mb-1 block">
+                    Jabatan / Keterangan Klien (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Finance Manager / Penanggung Jawab Acara / Klien"
+                    value={clientApprovalTitle}
+                    onChange={(e) => setClientApprovalTitle(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs text-white focus:border-blue-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Ditampilkan di bawah nama penandatangan klien.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-blue-950/30 border border-blue-900/40 rounded-lg p-2.5 flex items-center gap-2 text-[11px] text-blue-300">
+                <Check className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  Kolom pengesahan klien akan tercetak berdampingan dengan tanda tangan Mateha Production di lembar invoice.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center justify-end gap-3 pt-2">
           {editModeId && (
             <button
@@ -992,9 +1159,12 @@ export default function InvoiceView() {
                     </button>
 
                     <button
-                      onClick={() => handleDeleteSingle(inv.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSingle(inv);
+                      }}
                       className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 border border-slate-800 hover:border-rose-700 text-slate-500 hover:text-rose-400 transition cursor-pointer"
-                      title="Hapus"
+                      title="Hapus Invoice"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

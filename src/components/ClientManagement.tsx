@@ -52,6 +52,7 @@ export default function ClientManagement({
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     const qClients = query(collection(db, "clients"), orderBy("createdAt", "desc"));
@@ -161,14 +162,13 @@ export default function ClientManagement({
     }
   };
 
-  const handleDelete = async (id: string, clientName: string) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus data klien "${clientName}"?`)) {
-      try {
-        await deleteDoc(doc(db, "clients", id));
-        if (editingId === id) resetForm();
-      } catch (err: any) {
-        alert("Gagal menghapus: " + err.message);
-      }
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "clients", id));
+      if (editingId === id) resetForm();
+      setConfirmDeleteId(null);
+    } catch (err: any) {
+      setErrorMsg("Gagal menghapus klien: " + err.message);
     }
   };
 
@@ -476,14 +476,34 @@ export default function ClientManagement({
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(c.id, details.company || details.pic)}
-                    className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-                    title="Hapus Klien"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {confirmDeleteId === c.id ? (
+                    <div className="flex items-center gap-1 bg-rose-950/80 border border-rose-800/80 px-2 py-1 rounded-lg text-[10px]">
+                      <span className="text-rose-300 font-semibold">Hapus?</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(c.id)}
+                        className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer"
+                      >
+                        Ya
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(c.id)}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                      title="Hapus Klien"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

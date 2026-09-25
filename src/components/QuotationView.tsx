@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "firebase/firestore";
 import { db, sanitizeForFirestore } from "../utils/firebase";
 import { Quotation, QuotationItem, Bank, Client, formatRupiah } from "../types";
-import { Plus, Trash2, Save, FileText, Eye, Download, CheckCircle, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users } from "lucide-react";
+import { Plus, Trash2, Save, FileText, Eye, Download, CheckCircle, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users, UserCheck } from "lucide-react";
 import QuotationPreview from "./QuotationPreview";
 import BankManagementModal from "./BankManagementModal";
 import ClientManagement from "./ClientManagement";
@@ -13,6 +13,8 @@ import { saveAs } from "file-saver";
 
 export default function QuotationView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmQuo, setDeleteConfirmQuo] = useState<Quotation | null>(null);
+  const [acceptConfirmQuo, setAcceptConfirmQuo] = useState<Quotation | null>(null);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -37,6 +39,11 @@ export default function QuotationView() {
   const [items, setItems] = useState<QuotationItem[]>([]);
   const [termsAndConditions, setTermsAndConditions] = useState("Penawaran ini berlaku selama 14 hari kerja sejak diterbitkan.");
   const [saveToClientDb, setSaveToClientDb] = useState(false);
+
+  // Client Approval state
+  const [showClientApproval, setShowClientApproval] = useState(false);
+  const [clientApprovalName, setClientApprovalName] = useState("");
+  const [clientApprovalTitle, setClientApprovalTitle] = useState("");
 
   // New item draft input
   const [newItem, setNewItem] = useState({ description: "", qty: 1, price: 0 });
@@ -202,7 +209,10 @@ export default function QuotationView() {
           items,
           grandTotal,
           selectedBanks,
-          termsAndConditions: termsAndConditions.trim()
+          termsAndConditions: termsAndConditions.trim(),
+          showClientApproval: !!showClientApproval,
+          clientApprovalName: clientApprovalName.trim() || undefined,
+          clientApprovalTitle: clientApprovalTitle.trim() || undefined,
         });
         alert(`Perubahan penawaran ${editingQuotationNumber || ""} berhasil disimpan!`);
         cancelEdit();
@@ -224,6 +234,9 @@ export default function QuotationView() {
           createdAt: new Date().toISOString(),
           selectedBanks,
           termsAndConditions: termsAndConditions.trim(),
+          showClientApproval: !!showClientApproval,
+          clientApprovalName: clientApprovalName.trim() || undefined,
+          clientApprovalTitle: clientApprovalTitle.trim() || undefined,
         };
         await setDoc(doc(db, "quotations", id), sanitizeForFirestore(newQuotation));
         alert(`Surat Penawaran ${quotationNumber} berhasil dibuat!`);
@@ -264,6 +277,9 @@ export default function QuotationView() {
         setSelectedBankIds([]);
         setSaveToClientDb(false);
         setTermsAndConditions("Penawaran ini berlaku selama 14 hari kerja sejak diterbitkan.");
+        setShowClientApproval(false);
+        setClientApprovalName("");
+        setClientApprovalTitle("");
       }
     } catch (error) {
       console.error("Error saving quotation:", error);
@@ -283,6 +299,9 @@ export default function QuotationView() {
     setItems(quo.items ? JSON.parse(JSON.stringify(quo.items)) : []);
     setSelectedBankIds(quo.selectedBanks ? quo.selectedBanks.map(b => b.id) : []);
     setTermsAndConditions(quo.termsAndConditions || "Penawaran ini berlaku selama 14 hari kerja sejak diterbitkan.");
+    setShowClientApproval(!!quo.showClientApproval);
+    setClientApprovalName(quo.clientApprovalName || "");
+    setClientApprovalTitle(quo.clientApprovalTitle || "");
     setEditingItemIndex(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -299,13 +318,26 @@ export default function QuotationView() {
     setValidUntil("");
     setSelectedBankIds([]);
     setTermsAndConditions("Penawaran ini berlaku selama 14 hari kerja sejak diterbitkan.");
+    setShowClientApproval(false);
+    setClientApprovalName("");
+    setClientApprovalTitle("");
     setEditingItemIndex(null);
   };
 
-  const handleDeleteSingle = async (id: string) => {
-    if (confirm("Apakah Anda yakin ingin menghapus quotation ini?")) {
-      await deleteDoc(doc(db, "quotations", id));
-      if (editModeId === id) cancelEdit();
+  const handleDeleteSingle = (quo: Quotation) => {
+    setDeleteConfirmQuo(quo);
+  };
+
+  const executeDeleteSingle = async () => {
+    if (!deleteConfirmQuo) return;
+    try {
+      await deleteDoc(doc(db, "quotations", deleteConfirmQuo.id));
+      if (editModeId === deleteConfirmQuo.id) cancelEdit();
+      if (selectedQuotation?.id === deleteConfirmQuo.id) setSelectedQuotation(null);
+    } catch (err) {
+      console.error("Error deleting quotation:", err);
+    } finally {
+      setDeleteConfirmQuo(null);
     }
   };
 
@@ -317,8 +349,9 @@ export default function QuotationView() {
     cancelEdit();
   };
 
-  const acceptQuotation = async (quo: Quotation) => {
-    if (!confirm(`Setujui penawaran ${quo.quotationNumber} dan buat Invoice otomatis?`)) return;
+  const executeAcceptQuotation = async () => {
+    if (!acceptConfirmQuo) return;
+    const quo = acceptConfirmQuo;
     try {
       const invoiceId = Date.now().toString();
       const invoiceNumber = quo.quotationNumber.replace("QUO", "INV");
@@ -340,10 +373,10 @@ export default function QuotationView() {
       };
       await setDoc(doc(db, "invoices", invoiceId), sanitizeForFirestore(newInvoice));
       await updateDoc(doc(db, "quotations", quo.id), { status: "accepted" });
-      alert(`Berhasil! Invoice ${invoiceNumber} telah dibuat secara otomatis.`);
     } catch (error) {
       console.error("Error converting quotation to invoice:", error);
-      alert("Gagal menyetujui penawaran.");
+    } finally {
+      setAcceptConfirmQuo(null);
     }
   };
 
@@ -371,7 +404,13 @@ export default function QuotationView() {
 
   return (
     <div className="text-white space-y-6">
-      {selectedQuotation && <QuotationPreview quotation={selectedQuotation} onClose={() => setSelectedQuotation(null)} />}
+      {selectedQuotation && (
+        <QuotationPreview 
+          quotation={selectedQuotation} 
+          onClose={() => setSelectedQuotation(null)} 
+          onDelete={(quo) => setDeleteConfirmQuo(quo)}
+        />
+      )}
       
       {/* Bank Management Modal */}
       <BankManagementModal
@@ -392,6 +431,70 @@ export default function QuotationView() {
         onClose={() => setIsClientModalOpen(false)}
         onSelectClient={handleSelectClient}
       />
+
+      {/* Single Quotation Delete Confirmation Modal */}
+      {deleteConfirmQuo && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-3">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold mb-1.5 text-white">Hapus Quotation</h3>
+            <p className="text-slate-400 text-xs mb-5 leading-relaxed">
+              Apakah Anda yakin ingin menghapus surat penawaran <strong className="text-white font-mono">{deleteConfirmQuo.quotationNumber}</strong> ({deleteConfirmQuo.customerName})? Dokumen ini akan dihilangkan dari sistem.
+            </p>
+            <div className="flex gap-2.5 justify-end">
+              <button 
+                type="button" 
+                onClick={() => setDeleteConfirmQuo(null)} 
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                onClick={executeDeleteSingle} 
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-950 cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Accept Quotation & Generate Invoice Modal */}
+      {acceptConfirmQuo && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold mb-1.5 text-white">Setujui Penawaran</h3>
+            <p className="text-slate-400 text-xs mb-5 leading-relaxed">
+              Setujui penawaran <strong className="text-white font-mono">{acceptConfirmQuo.quotationNumber}</strong> untuk <strong>{acceptConfirmQuo.customerName}</strong>? Sistem akan otomatis membuatkan faktur tagihan invoice baru.
+            </p>
+            <div className="flex gap-2.5 justify-end">
+              <button 
+                type="button" 
+                onClick={() => setAcceptConfirmQuo(null)} 
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                onClick={executeAcceptQuotation} 
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-950 cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Ya, Setujui & Buat Invoice</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -853,6 +956,107 @@ export default function QuotationView() {
           )}
         </div>
 
+        {/* PENGATURAN APPROVAL KLIEN */}
+        <div className="bg-slate-950/70 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-cyan-950/60 border border-cyan-800/50 text-cyan-400">
+                <UserCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Approval / Lembar Pengesahan Klien
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Tampilkan kolom tanda tangan persetujuan klien di surat penawaran
+                </p>
+              </div>
+            </div>
+
+            <label className="relative inline-flex items-center cursor-pointer self-start sm:self-auto">
+              <input
+                type="checkbox"
+                checked={showClientApproval}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setShowClientApproval(val);
+                  if (val && !clientApprovalName && customerContact) {
+                    setClientApprovalName(customerContact);
+                    if (!clientApprovalTitle) setClientApprovalTitle("PIC / Penanggung Jawab");
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+              <span className="ml-2.5 text-xs font-semibold text-slate-300">
+                {showClientApproval ? "Aktif (Ditampilkan)" : "Nonaktif (Sembunyikan)"}
+              </span>
+            </label>
+          </div>
+
+          {showClientApproval && (
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-slate-300 font-semibold">Identitas Penandatangan Klien:</span>
+                {customerContact && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClientApprovalName(customerContact);
+                      if (!clientApprovalTitle) setClientApprovalTitle("PIC / Penanggung Jawab");
+                    }}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 hover:border-cyan-700 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Check className="w-3 h-3" />
+                    <span>Sama dengan PIC ({customerContact})</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold mb-1 block">
+                    Nama Approval / Penandatangan Klien
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={customerContact || "Contoh: Bpk. Bambang Sutrisno / Ibu Rina"}
+                    value={clientApprovalName}
+                    onChange={(e) => setClientApprovalName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs text-white focus:border-cyan-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Bisa sama dengan PIC atau nama pejabat/atasan klien yang berbeda.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold mb-1 block">
+                    Jabatan / Keterangan Klien (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Manager Operasional / Project Leader / Klien"
+                    value={clientApprovalTitle}
+                    onChange={(e) => setClientApprovalTitle(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 px-3.5 py-2.5 rounded-xl text-xs text-white focus:border-cyan-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Ditampilkan di bawah nama penandatangan klien.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-cyan-950/30 border border-cyan-900/40 rounded-lg p-2.5 flex items-center gap-2 text-[11px] text-cyan-300">
+                <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  Kolom pengesahan klien akan tercetak berdampingan dengan tanda tangan Mateha Production di lembar penawaran.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center justify-end gap-3 pt-2">
           {editModeId && (
             <button
@@ -962,7 +1166,7 @@ export default function QuotationView() {
 
                     {!isAccepted && (
                       <button
-                        onClick={() => acceptQuotation(quo)}
+                        onClick={() => setAcceptConfirmQuo(quo)}
                         className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-bold transition cursor-pointer"
                         title="Setujui dan buat Invoice otomatis"
                       >
@@ -981,7 +1185,10 @@ export default function QuotationView() {
                     </button>
 
                     <button
-                      onClick={() => handleDeleteSingle(quo.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSingle(quo);
+                      }}
                       className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 border border-slate-800 hover:border-rose-700 text-slate-500 hover:text-rose-400 transition cursor-pointer"
                       title="Hapus"
                     >
