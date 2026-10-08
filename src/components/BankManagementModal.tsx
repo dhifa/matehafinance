@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Bank } from "../types";
 import { doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "../utils/firebase";
+import { notify } from "../utils/notification";
 import { 
   Building2, 
   Plus, 
@@ -127,9 +128,11 @@ export default function BankManagementModal({
       };
 
       await setDoc(doc(db, "banks", id), bankData);
+      notify.success(editingId ? "Data rekening bank berhasil diperbarui!" : "Rekening bank baru berhasil disimpan!", "Database Bank");
       resetForm();
     } catch (err: any) {
       console.error(err);
+      notify.error("Gagal menyimpan rekening bank: " + (err.message || "Unknown error"), "Database Bank");
       setErrorMsg("Gagal menyimpan rekening bank: " + (err.message || "Unknown error"));
     } finally {
       setSaving(false);
@@ -139,10 +142,12 @@ export default function BankManagementModal({
   const handleDelete = async (id: string) => {
     try {
       await deleteDoc(doc(db, "banks", id));
+      notify.success("Rekening bank berhasil dihapus!", "Database Bank");
       if (editingId === id) resetForm();
       setConfirmDeleteId(null);
     } catch (err: any) {
       console.error("Gagal menghapus rekening:", err);
+      notify.error("Gagal menghapus rekening: " + err.message, "Database Bank");
     }
   };
 
@@ -151,8 +156,9 @@ export default function BankManagementModal({
       for (const b of banks) {
         await updateDoc(doc(db, "banks", b.id), { isDefault: b.id === bankId });
       }
+      notify.success("Rekening bank utama berhasil diatur!", "Database Bank");
     } catch (err: any) {
-      alert("Gagal mengubah rekening utama: " + err.message);
+      notify.error("Gagal mengubah rekening utama: " + err.message, "Database Bank");
     }
   };
 
@@ -168,9 +174,10 @@ export default function BankManagementModal({
         isDefault: true,
         createdAt: new Date().toISOString(),
       });
+      notify.success("Rekening BCA default berhasil dibuat!", "Database Bank");
       resetForm();
     } catch (err: any) {
-      alert("Gagal menambahkan default: " + err.message);
+      notify.error("Gagal menambahkan default: " + err.message, "Database Bank");
     } finally {
       setSaving(false);
     }

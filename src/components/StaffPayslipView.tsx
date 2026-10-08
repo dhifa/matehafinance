@@ -253,30 +253,16 @@ export default function StaffPayslipView({
     return () => unsub();
   }, [isAdmin, currentUserProfile?.uid]);
 
-  // Filter kasbon requests for current staff (or all if admin)
+  // Filter kasbon requests strictly for current user (staff and admin each only see their own personal kasbon requests here)
   const myKasbonRequests = useMemo(() => {
-    if (isAdmin) return kasbonList;
-    return kasbonList.filter((k) => k.staffUid === currentUserProfile.uid || k.staffUsername.toLowerCase() === currentUserProfile.username.toLowerCase());
-  }, [kasbonList, currentUserProfile, isAdmin]);
-
-  // Admin handles approve/reject kasbon
-  const handleUpdateKasbonStatus = async (reqId: string, newStatus: "approved" | "rejected") => {
-    if (!isAdmin) {
-      onNotify("Hanya Administrator yang dapat memproses pengajuan kasbon!", "error");
-      return;
-    }
-    try {
-      await updateDoc(doc(db, "kasbon_requests", reqId), {
-        status: newStatus,
-        approvedAt: new Date().toISOString(),
-        approvedBy: currentUserProfile.username
-      });
-      onNotify(`Pengajuan kasbon telah di-${newStatus === "approved" ? "setujui" : "tolak"}!`, "success");
-    } catch (err: any) {
-      console.error("Error updating kasbon status:", err);
-      onNotify("Gagal memperbarui status kasbon: " + (err.message || "Periksa hak akses admin"), "error");
-    }
-  };
+    const curUid = currentUserProfile?.uid;
+    const curUsername = (currentUserProfile?.username || "").toLowerCase().trim();
+    return kasbonList.filter((k) => {
+      const matchUid = curUid && k.staffUid === curUid;
+      const matchUsername = curUsername && (k.staffUsername || "").toLowerCase().trim() === curUsername;
+      return matchUid || matchUsername;
+    });
+  }, [kasbonList, currentUserProfile]);
 
   // Helper date checker for projects in selected period
   const isProjInSelectedPeriod = (proj: EventProject) => {
@@ -2197,16 +2183,16 @@ export default function StaffPayslipView({
               </div>
             </div>
 
-            {/* RIGHT: RIWAYAT PENGAJUAN KASBON & APPROVAL ADMIN */}
+            {/* RIGHT: RIWAYAT PENGAJUAN KASBON */}
             <div className="lg:col-span-7 space-y-4">
               <div className="bg-[#0c0e12]/80 border border-slate-900 p-6 rounded-2xl shadow-xl space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-900">
                   <div>
                     <h3 className="text-sm font-extrabold text-white">
-                      {isAdmin ? "Pusat Persetujuan Kasbon Staff (Admin)" : "Riwayat Pengajuan Kasbon Anda"}
+                      Riwayat Pengajuan Kasbon Anda
                     </h3>
                     <p className="text-[10px] text-slate-400">
-                      {isAdmin ? "Pantau pengajuan kasbon dari seluruh staff, setujui atau tolak permintaan." : "Daftar permohonan kasbon dan status verifikasi dari Admin"}
+                      Daftar permohonan kasbon dan status verifikasi dari Admin
                     </p>
                   </div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
@@ -2332,24 +2318,6 @@ export default function StaffPayslipView({
                                 )}
                               </button>
                             )}
-                          </div>
-                        )}
-
-                        {/* Admin action buttons */}
-                        {isAdmin && k.status === "pending" && (
-                          <div className="pt-2 flex justify-end items-center space-x-2 border-t border-slate-900">
-                            <button
-                              onClick={() => handleUpdateKasbonStatus(k.id, "rejected")}
-                              className="px-3 py-1 bg-rose-950/40 hover:bg-rose-900/40 text-rose-400 border border-rose-800/40 rounded-lg text-xs font-bold transition cursor-pointer"
-                            >
-                              Tolak
-                            </button>
-                            <button
-                              onClick={() => handleUpdateKasbonStatus(k.id, "approved")}
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded-lg text-xs font-extrabold transition cursor-pointer shadow"
-                            >
-                              Setujui Kasbon
-                            </button>
                           </div>
                         )}
 

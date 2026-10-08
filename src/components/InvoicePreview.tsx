@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Invoice, formatRupiah } from "../types";
 import { generateInvoicePdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
+import { notify } from "../utils/notification";
 import { formatDateString } from "../utils/date";
 import { terbilang } from "../utils/numberToWords";
 import { Download, Printer, X, FileText, Loader2, Copy, Check, UserCheck, Trash2 } from "lucide-react";
@@ -38,7 +39,7 @@ export default function InvoicePreview({
       saveAs(blob, cleanFileName);
     } catch (err) {
       console.error("Error generating invoice PDF:", err);
-      alert("Gagal mengunduh PDF. Silakan coba lagi.");
+      notify.error("Gagal mengunduh PDF. Silakan coba lagi.", "Unduh Gagal");
     } finally {
       setIsExporting(false);
     }
@@ -231,9 +232,16 @@ export default function InvoicePreview({
                       {/* DOKUMEN TITLE */}
                       <div className="mb-6">
                         <div className="text-center mb-5">
-                          <h1 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight">
-                            INVOICE TAGIHAN
-                          </h1>
+                          <div className="flex items-center justify-center gap-2 flex-wrap">
+                            <h1 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight">
+                              {invoice.isDp ? "FAKTUR INVOICE (UANG MUKA / DP)" : "INVOICE TAGIHAN"}
+                            </h1>
+                            {invoice.isDp && (
+                              <span className="bg-amber-100 text-amber-800 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border border-amber-300 uppercase tracking-wide font-mono">
+                                DP {invoice.dpPercent ? `${invoice.dpPercent}%` : ''}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs font-mono font-bold text-sky-700 tracking-wider mt-0.5">
                             NO: {invoice.invoiceNumber}
                           </p>
@@ -353,22 +361,61 @@ export default function InvoicePreview({
 
                       {page.isLastPage && (
                         <tfoot>
-                          <tr className="bg-slate-100 border-t-2 border-slate-300 font-bold text-xs text-slate-800">
-                            <td colSpan={3} className="py-2 px-3 border border-slate-300 text-right uppercase tracking-wider">
-                              Subtotal
-                            </td>
-                            <td colSpan={2} className="py-2 px-3 border border-slate-300 text-right font-mono font-bold text-slate-900">
-                              {formatRupiah(invoice.grandTotal)}
-                            </td>
-                          </tr>
-                          <tr className="bg-slate-900 text-white font-extrabold text-sm">
-                            <td colSpan={3} className="py-2.5 px-3 border border-slate-900 text-right uppercase tracking-wider">
-                              Total Tagihan
-                            </td>
-                            <td colSpan={2} className="py-2.5 px-3 border border-slate-900 text-right font-mono text-cyan-300 text-base">
-                              {formatRupiah(invoice.grandTotal)}
-                            </td>
-                          </tr>
+                          {invoice.isDp ? (
+                            <>
+                              <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold text-xs text-slate-700">
+                                <td colSpan={3} className="py-2 px-3 border border-slate-300 text-right uppercase tracking-wider">
+                                  Total Nilai Kontrak / Proyek
+                                </td>
+                                <td colSpan={2} className="py-2 px-3 border border-slate-300 text-right font-mono font-bold text-slate-900">
+                                  {formatRupiah(invoice.totalAmount || invoice.items.reduce((s, itm) => s + itm.total, 0))}
+                                </td>
+                              </tr>
+                              <tr className="bg-amber-50/80 font-bold text-xs text-amber-900">
+                                <td colSpan={3} className="py-2 px-3 border border-slate-300 text-right uppercase tracking-wider">
+                                  Uang Muka / Down Payment (DP {invoice.dpPercent ? `${invoice.dpPercent}%` : ''})
+                                </td>
+                                <td colSpan={2} className="py-2 px-3 border border-slate-300 text-right font-mono font-bold text-amber-800">
+                                  {formatRupiah(invoice.grandTotal)}
+                                </td>
+                              </tr>
+                              <tr className="bg-slate-900 text-white font-extrabold text-sm">
+                                <td colSpan={3} className="py-2.5 px-3 border border-slate-900 text-right uppercase tracking-wider">
+                                  Total Tagihan Faktur Ini (DP)
+                                </td>
+                                <td colSpan={2} className="py-2.5 px-3 border border-slate-900 text-right font-mono text-cyan-300 text-base">
+                                  {formatRupiah(invoice.grandTotal)}
+                                </td>
+                              </tr>
+                              <tr className="bg-slate-100 font-semibold text-xs text-slate-600">
+                                <td colSpan={3} className="py-1.5 px-3 border border-slate-300 text-right uppercase tracking-wider">
+                                  Sisa Tagihan (Pelunasan Nanti)
+                                </td>
+                                <td colSpan={2} className="py-1.5 px-3 border border-slate-300 text-right font-mono font-bold text-slate-700">
+                                  {formatRupiah(invoice.remainingAmount ?? Math.max(0, (invoice.totalAmount || invoice.items.reduce((s, itm) => s + itm.total, 0)) - invoice.grandTotal))}
+                                </td>
+                              </tr>
+                            </>
+                          ) : (
+                            <>
+                              <tr className="bg-slate-100 border-t-2 border-slate-300 font-bold text-xs text-slate-800">
+                                <td colSpan={3} className="py-2 px-3 border border-slate-300 text-right uppercase tracking-wider">
+                                  Subtotal
+                                </td>
+                                <td colSpan={2} className="py-2 px-3 border border-slate-300 text-right font-mono font-bold text-slate-900">
+                                  {formatRupiah(invoice.grandTotal)}
+                                </td>
+                              </tr>
+                              <tr className="bg-slate-900 text-white font-extrabold text-sm">
+                                <td colSpan={3} className="py-2.5 px-3 border border-slate-900 text-right uppercase tracking-wider">
+                                  Total Tagihan
+                                </td>
+                                <td colSpan={2} className="py-2.5 px-3 border border-slate-900 text-right font-mono text-cyan-300 text-base">
+                                  {formatRupiah(invoice.grandTotal)}
+                                </td>
+                              </tr>
+                            </>
+                          )}
                         </tfoot>
                       )}
                     </table>
@@ -382,6 +429,16 @@ export default function InvoicePreview({
 
                   {page.isLastPage && (
                     <>
+                      {/* CATATAN DP NOTICE */}
+                      {invoice.isDp && (
+                        <div className="mb-4 bg-amber-50/80 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex items-start gap-2">
+                          <span className="font-bold text-amber-700 whitespace-nowrap">ℹ️ Informasi DP:</span>
+                          <div>
+                            Faktur ini merupakan penagihan <strong>Uang Muka (DP {invoice.dpPercent ? `${invoice.dpPercent}%` : ''})</strong> sebesar <strong>{formatRupiah(invoice.grandTotal)}</strong>. Sisa tagihan kontrak sebesar <strong>{formatRupiah(invoice.remainingAmount ?? Math.max(0, (invoice.totalAmount || 0) - invoice.grandTotal))}</strong> akan ditagihkan pada invoice pelunasan berikutnya.
+                          </div>
+                        </div>
+                      )}
+
                       {/* TERBILANG BOX */}
                       <div className="mb-6 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs">
                         <span className="text-slate-500 font-semibold">Terbilang : </span>
@@ -436,7 +493,7 @@ export default function InvoicePreview({
                             <div className="text-center w-56 sm:w-64">
                               <p className="text-xs text-slate-600 mb-1">Disetujui & Diterima Oleh,</p>
                               <p className="text-xs font-bold text-slate-900 mb-2">Pihak Klien / Pemesan</p>
-                              <div className="h-20" />
+                              <div className="h-24" />
                               <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
                                 {invoice.clientApprovalName || invoice.customerContact || "( ................................... )"}
                               </p>
@@ -449,8 +506,8 @@ export default function InvoicePreview({
                             <div className="text-center w-56 sm:w-64">
                               <p className="text-xs text-slate-600 mb-1">Bandung, {formattedDate}</p>
                               <p className="text-xs font-bold text-slate-900 mb-2">Hormat Kami,</p>
-                              <div className="relative h-20 flex items-center justify-center">
-                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-36 max-h-20 object-contain mx-auto" />
+                              <div className="relative h-24 flex items-center justify-center">
+                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-48 max-h-24 object-contain mx-auto scale-125" />
                               </div>
                               <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
                                 Dhifa Aksa Hermawan
@@ -468,8 +525,8 @@ export default function InvoicePreview({
                             <div className="text-center w-60">
                               <p className="text-xs text-slate-600 mb-1">Bandung, {formattedDate}</p>
                               <p className="text-xs font-semibold text-slate-800 mb-2">Hormat Kami,</p>
-                              <div className="relative h-20 flex items-center justify-center">
-                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-36 max-h-20 object-contain mx-auto" />
+                              <div className="relative h-24 flex items-center justify-center">
+                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-48 max-h-24 object-contain mx-auto scale-125" />
                               </div>
                               <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
                                 Dhifa Aksa Hermawan

@@ -4,12 +4,25 @@ import { doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove } from "fir
 import { MatehaAccount, MatehaTransaction, formatRupiah, EventProject, SyncedProject } from "../types";
 import { ArrowLeftRight, PiggyBank, Wallet, PlusCircle, MinusCircle, History, Trash2, RefreshCw, FileDown } from "lucide-react";
 import { calculateProjectBudget } from "../utils/math";
+import { notify } from "../utils/notification";
 
 interface MatehaFinanceProps {
   projects: EventProject[];
+  onNotify?: (text: string, type?: "success" | "error" | "warning" | "info", title?: string) => void;
 }
 
-export const MatehaFinance: React.FC<MatehaFinanceProps> = ({ projects }) => {
+export const MatehaFinance: React.FC<MatehaFinanceProps> = ({ projects, onNotify }) => {
+  const showNotification = (
+    text: string,
+    type: "success" | "error" | "warning" | "info" = "success",
+    title?: string
+  ) => {
+    if (onNotify) {
+      onNotify(text, type, title);
+    } else {
+      notify[type === "error" ? "error" : type === "warning" ? "warning" : type === "info" ? "info" : "success"](text, title);
+    }
+  };
   const [accounts, setAccounts] = useState<MatehaAccount[]>([
     { id: "kantong1", name: "Kantong 1 (Transaksi)", balance: 0 },
     { id: "kantong2", name: "Kantong 2 (Saving)", balance: 0 },
@@ -154,9 +167,9 @@ export const MatehaFinance: React.FC<MatehaFinanceProps> = ({ projects }) => {
             transactions: arrayUnion(...transactionsToAdd),
             syncedProjects: updatedSyncedProjects
         });
-        alert(`Berhasil melakukan sinkronisasi ${transactionsToAdd.length} transaksi.`);
+        showNotification(`Berhasil melakukan sinkronisasi ${transactionsToAdd.length} transaksi ke Keuangan Mateha.`, "success", "Sinkronisasi Berhasil");
     } else {
-        alert("Tidak ada pembayaran baru untuk disinkronisasi.");
+        showNotification("Tidak ada pembayaran baru dari event untuk disinkronisasi.", "info", "Sinkronisasi Selesai");
     }
   };
 

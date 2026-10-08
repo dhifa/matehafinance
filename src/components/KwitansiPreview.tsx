@@ -141,7 +141,7 @@ export default function KwitansiPreview({ kwitansi, invoice, onClose }: Kwitansi
             <div className="text-center">
               <p className="text-xs text-slate-600 mb-1">Bandung, {formattedDate}</p>
               <p className="text-xs text-slate-500 mb-1">Yang Menerima,</p>
-              <img src="/logo-ttd.png" alt="TTD" className="w-28 mx-auto" />
+              <img src="/logo-ttd.png" alt="TTD" className="w-40 max-h-24 object-contain mx-auto scale-110" />
               <p className="font-bold underline text-xs text-slate-900 mt-1">{receiverName}</p>
               <p className="text-[10px] text-slate-500">{receiverTitle}</p>
             </div>

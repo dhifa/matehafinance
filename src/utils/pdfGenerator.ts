@@ -338,23 +338,49 @@ export const generateQuotationPdfBlob = async (quotation: Quotation): Promise<Bl
             ${quotation.showClientApproval ? `
               <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
                 <tr>
-                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-right: 15px;">
-                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Disetujui & Diterima Oleh,</p>
-                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Pihak Klien / Pemesan</p>
-                    <div style="height: 52px;"></div>
-                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-right: 20px;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px; line-height: 1.3;">Disetujui & Diterima Oleh,</p>
+                  </td>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-left: 20px;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px; line-height: 1.3;">Bandung, ${formattedDate}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-right: 20px;">
+                    <p style="margin: 0 0 4px 0; font-weight: 700; color: #0f172a; font-size: 11px; line-height: 1.3;">Pihak Klien / Pemesan</p>
+                  </td>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-left: 20px;">
+                    <p style="margin: 0 0 4px 0; font-weight: 700; color: #0f172a; font-size: 11px; line-height: 1.3;">Hormat Kami,</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; height: 72px; vertical-align: middle; text-align: center; padding-right: 20px;">
+                    <div style="height: 72px;"></div>
+                  </td>
+                  <td style="width: 50%; height: 72px; vertical-align: middle; text-align: center; padding-left: 20px;">
+                    <div style="height: 72px; display: flex; align-items: center; justify-content: center;">
+                      <img src="${logoTtd}" alt="TTD" style="height: 70px; max-height: 70px; width: auto; max-width: 175px; object-fit: contain; margin: 0 auto; display: block;" />
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-right: 20px;">
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; line-height: 1.3; text-decoration: underline;">
                       ${quotation.clientApprovalName || quotation.customerContact || '( ................................... )'}
                     </p>
-                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">
+                  </td>
+                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-left: 20px;">
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; line-height: 1.3; text-decoration: underline;">Dhifa Aksa Hermawan</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-right: 20px;">
+                    <p style="color: #64748b; margin: 2px 0 0 0; font-size: 9.5px; line-height: 1.3; font-weight: 600;">
                       ${quotation.clientApprovalTitle || quotation.customerName || 'Klien / Pemesan'}
                     </p>
                   </td>
-                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-left: 15px;">
-                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
-                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
-                    <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
-                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
-                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-left: 20px;">
+                    <p style="color: #64748b; margin: 2px 0 0 0; font-size: 9.5px; line-height: 1.3; font-weight: 600;">CEO Mateha Production</p>
                   </td>
                 </tr>
               </table>
@@ -368,7 +394,9 @@ export const generateQuotationPdfBlob = async (quotation: Quotation): Promise<Bl
                   <td style="width: 40%; vertical-align: bottom; text-align: center;">
                     <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
                     <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
-                    <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
+                    <div style="height: 72px; display: flex; align-items: center; justify-content: center;">
+                      <img src="${logoTtd}" alt="TTD" style="height: 70px; max-height: 70px; width: auto; max-width: 175px; object-fit: contain; margin: 0 auto; display: block;" />
+                    </div>
                     <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
                     <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
                   </td>
@@ -445,7 +473,7 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
 
             <!-- JUDUL SURAT -->
             <div style="text-align: center; margin-bottom: 12px;">
-              <h1 style="font-size: 20px; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">INVOICE TAGIHAN</h1>
+              <h1 style="font-size: 20px; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">${invoice.isDp ? `FAKTUR INVOICE (UANG MUKA / DP ${invoice.dpPercent ? `${invoice.dpPercent}%` : ''})` : 'INVOICE TAGIHAN'}</h1>
               <p style="color: #0284c7; font-size: 12px; font-weight: 800; margin: 2px 0 0 0; font-family: monospace;">NO: ${invoice.invoiceNumber}</p>
             </div>
             
@@ -487,7 +515,7 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
             <!-- CONTINUATION REFERENCE BANNER -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
               <div>
-                <strong style="color: #0f172a; text-transform: uppercase;">INVOICE TAGIHAN (LANJUTAN)</strong>
+                <strong style="color: #0f172a; text-transform: uppercase;">${invoice.isDp ? 'INVOICE UANG MUKA / DP (LANJUTAN)' : 'INVOICE TAGIHAN (LANJUTAN)'}</strong>
                 <span style="color: #64748b; margin-left: 8px;">No: <strong style="color: #0284c7; font-family: monospace;">${invoice.invoiceNumber}</strong></span>
               </div>
               <div style="color: #475569;">
@@ -519,14 +547,33 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
               `).join('')}
 
               ${page.isLastPage ? `
-                <tr style="background-color: #f1f5f9; font-weight: 800;">
-                  <td colspan="3" style="padding: 6px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 10px; text-transform: uppercase; color: #475569;">Subtotal</td>
-                  <td colspan="2" style="padding: 6px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 11px; font-family: monospace; color: #0f172a;">${formatRupiah(invoice.grandTotal)}</td>
-                </tr>
-                <tr style="background-color: #0f172a; color: #ffffff; font-weight: 900;">
-                  <td colspan="3" style="padding: 7px 10px; text-align: right; border: 1px solid #0f172a; font-size: 10.5px; text-transform: uppercase;">Total Tagihan</td>
-                  <td colspan="2" style="padding: 7px 10px; text-align: right; border: 1px solid #0f172a; font-size: 12.5px; font-family: monospace; color: #38bdf8;">${formatRupiah(invoice.grandTotal)}</td>
-                </tr>
+                ${invoice.isDp ? `
+                  <tr style="background-color: #f8fafc; font-weight: 700;">
+                    <td colspan="3" style="padding: 5px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 10px; text-transform: uppercase; color: #475569;">Total Nilai Kontrak / Proyek</td>
+                    <td colspan="2" style="padding: 5px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 10.5px; font-family: monospace; color: #1e293b;">${formatRupiah(invoice.totalAmount || invoice.items.reduce((s, itm) => s + itm.total, 0))}</td>
+                  </tr>
+                  <tr style="background-color: #fef3c7; font-weight: 700;">
+                    <td colspan="3" style="padding: 5px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 10px; text-transform: uppercase; color: #92400e;">Uang Muka (DP ${invoice.dpPercent ? `${invoice.dpPercent}%` : ''})</td>
+                    <td colspan="2" style="padding: 5px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 10.5px; font-family: monospace; color: #92400e; font-weight: 800;">${formatRupiah(invoice.grandTotal)}</td>
+                  </tr>
+                  <tr style="background-color: #0f172a; color: #ffffff; font-weight: 900;">
+                    <td colspan="3" style="padding: 7px 10px; text-align: right; border: 1px solid #0f172a; font-size: 10.5px; text-transform: uppercase;">Total Tagihan Faktur Ini (DP)</td>
+                    <td colspan="2" style="padding: 7px 10px; text-align: right; border: 1px solid #0f172a; font-size: 12.5px; font-family: monospace; color: #38bdf8;">${formatRupiah(invoice.grandTotal)}</td>
+                  </tr>
+                  <tr style="background-color: #f1f5f9; font-weight: 600;">
+                    <td colspan="3" style="padding: 4px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 9.5px; text-transform: uppercase; color: #64748b;">Sisa Tagihan (Pelunasan Nanti)</td>
+                    <td colspan="2" style="padding: 4px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 10px; font-family: monospace; color: #475569;">${formatRupiah(invoice.remainingAmount ?? Math.max(0, (invoice.totalAmount || invoice.items.reduce((s, itm) => s + itm.total, 0)) - invoice.grandTotal))}</td>
+                  </tr>
+                ` : `
+                  <tr style="background-color: #f1f5f9; font-weight: 800;">
+                    <td colspan="3" style="padding: 6px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 10px; text-transform: uppercase; color: #475569;">Subtotal</td>
+                    <td colspan="2" style="padding: 6px 10px; text-align: right; border: 1px solid #cbd5e1; font-size: 11px; font-family: monospace; color: #0f172a;">${formatRupiah(invoice.grandTotal)}</td>
+                  </tr>
+                  <tr style="background-color: #0f172a; color: #ffffff; font-weight: 900;">
+                    <td colspan="3" style="padding: 7px 10px; text-align: right; border: 1px solid #0f172a; font-size: 10.5px; text-transform: uppercase;">Total Tagihan</td>
+                    <td colspan="2" style="padding: 7px 10px; text-align: right; border: 1px solid #0f172a; font-size: 12.5px; font-family: monospace; color: #38bdf8;">${formatRupiah(invoice.grandTotal)}</td>
+                  </tr>
+                `}
               ` : ''}
             </tbody>
           </table>
@@ -537,6 +584,12 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
               [ ➔ Rincian Tagihan & Lembar Pembayaran Bersambung ke Lembar ${page.pageNumber + 1} dari ${page.totalPages} ]
             </div>
           ` : `
+            ${invoice.isDp ? `
+              <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 5px 9px; margin-bottom: 8px; font-size: 10px; color: #92400e;">
+                <strong>Catatan Uang Muka (DP):</strong> Faktur ini merupakan penagihan DP ${invoice.dpPercent ? `sebesar ${invoice.dpPercent}%` : ''} (${formatRupiah(invoice.grandTotal)}). Sisa tagihan kontrak sebesar <strong>${formatRupiah(invoice.remainingAmount ?? Math.max(0, (invoice.totalAmount || 0) - invoice.grandTotal))}</strong> akan ditagihkan pada invoice pelunasan berikutnya.
+              </div>
+            ` : ''}
+
             <!-- TERBILANG -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-size: 10.5px;">
               <span style="color: #64748b; font-weight: 600;">Terbilang : </span>
@@ -577,23 +630,49 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
             ${invoice.showClientApproval ? `
               <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
                 <tr>
-                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-right: 15px;">
-                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Disetujui & Diterima Oleh,</p>
-                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Pihak Klien / Pemesan</p>
-                    <div style="height: 52px;"></div>
-                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-right: 20px;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px; line-height: 1.3;">Disetujui & Diterima Oleh,</p>
+                  </td>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-left: 20px;">
+                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px; line-height: 1.3;">Bandung, ${formattedDate}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-right: 20px;">
+                    <p style="margin: 0 0 4px 0; font-weight: 700; color: #0f172a; font-size: 11px; line-height: 1.3;">Pihak Klien / Pemesan</p>
+                  </td>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-left: 20px;">
+                    <p style="margin: 0 0 4px 0; font-weight: 700; color: #0f172a; font-size: 11px; line-height: 1.3;">Hormat Kami,</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; height: 72px; vertical-align: middle; text-align: center; padding-right: 20px;">
+                    <div style="height: 72px;"></div>
+                  </td>
+                  <td style="width: 50%; height: 72px; vertical-align: middle; text-align: center; padding-left: 20px;">
+                    <div style="height: 72px; display: flex; align-items: center; justify-content: center;">
+                      <img src="${logoTtd}" alt="TTD" style="height: 70px; max-height: 70px; width: auto; max-width: 175px; object-fit: contain; margin: 0 auto; display: block;" />
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-right: 20px;">
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; line-height: 1.3; text-decoration: underline;">
                       ${invoice.clientApprovalName || invoice.customerContact || '( ................................... )'}
                     </p>
-                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">
+                  </td>
+                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-left: 20px;">
+                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-right: 20px;">
+                    <p style="color: #64748b; margin: 2px 0 0 0; font-size: 9.5px; line-height: 1.3; font-weight: 600;">
                       ${invoice.clientApprovalTitle || invoice.customerName || 'Klien / Pemesan'}
                     </p>
                   </td>
-                  <td style="width: 50%; vertical-align: bottom; text-align: center; padding-left: 15px;">
-                    <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
-                    <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
-                    <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
-                    <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
-                    <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
+                  <td style="width: 50%; vertical-align: top; text-align: center; padding-left: 20px;">
+                    <p style="color: #64748b; margin: 2px 0 0 0; font-size: 9.5px; line-height: 1.3; font-weight: 600;">CEO Mateha Production</p>
                   </td>
                 </tr>
               </table>
@@ -607,7 +686,9 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
                   <td style="width: 40%; vertical-align: bottom; text-align: center;">
                     <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
                     <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
-                    <img src="${logoTtd}" alt="TTD" style="width: 120px; margin: 0 auto 2px auto; display: block;" />
+                    <div style="height: 72px; display: flex; align-items: center; justify-content: center;">
+                      <img src="${logoTtd}" alt="TTD" style="height: 70px; max-height: 70px; width: auto; max-width: 175px; object-fit: contain; margin: 0 auto; display: block;" />
+                    </div>
                     <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
                     <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
                   </td>
@@ -722,7 +803,7 @@ export const generateKwitansiItemPdfBlob = async (kwitansi: Kwitansi): Promise<B
             <td style="vertical-align: bottom; text-align: center; width: 230px;">
               <p style="font-size: 12px; color: #475569; margin: 0 0 2px 0;">Bandung, ${formattedDate}</p>
               <p style="font-size: 12px; font-weight: 700; color: #0f172a; margin: 0 0 4px 0;">Yang Menerima,</p>
-              <img src="${logoTtd}" style="width: 130px; margin: 0 auto 4px auto; display: block;" />
+              <img src="${logoTtd}" style="width: 165px; max-height: 75px; object-fit: contain; margin: 0 auto 4px auto; display: block;" />
               <p style="font-weight: 800; text-decoration: underline; font-size: 13px; color: #0f172a; margin: 2px 0 0 0;">${receiverName}</p>
               <p style="font-size: 11px; color: #64748b; margin: 0; font-weight: 600;">${receiverTitle}</p>
             </td>

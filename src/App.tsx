@@ -67,6 +67,8 @@ import UserManagement from "./components/UserManagement";
 import BackupExport from "./components/BackupExport";
 import StaffPayslipView from "./components/StaffPayslipView";
 import ChangePasswordModal from "./components/ChangePasswordModal";
+import NotificationModal, { PopupNotificationState } from "./components/NotificationModal";
+import { setGlobalNotificationListener, notify } from "./utils/notification";
 import logo from "/favicon.png";
 
 // Firebase operations
@@ -315,16 +317,46 @@ export default function App() {
     type?: "delete" | "warning";
   } | null>(null);
 
-  // Feedback notifications
-  const [notification, setNotification] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  // Feedback notifications as Modal Pop up
+  const [popupNotification, setPopupNotification] = useState<PopupNotificationState | null>(null);
 
-  // Utility to trigger visual notifications
-  const triggerNotification = (text: string, type: "success" | "error" = "success") => {
-    setNotification({ text, type });
-    setTimeout(() => {
-      setNotification(null);
-    }, 4500);
+  // Utility to trigger visual pop up notifications
+  const triggerNotification = (
+    text: string,
+    type: "success" | "error" | "warning" | "info" = "success",
+    title?: string
+  ) => {
+    const defaultTitles: Record<string, string> = {
+      success: "Berhasil",
+      error: "Perhatian / Terjadi Kesalahan",
+      warning: "Peringatan",
+      info: "Pemberitahuan Sistem",
+    };
+    setPopupNotification({
+      isOpen: true,
+      type,
+      title: title || defaultTitles[type] || "Pemberitahuan",
+      message: text,
+      confirmText: "OK, Mengerti",
+      autoCloseMs: type === "success" ? 4000 : undefined,
+    });
   };
+
+  useEffect(() => {
+    setGlobalNotificationListener((state) => {
+      setPopupNotification(state);
+    });
+    const handleCustomEvent = (e: any) => {
+      if (e.detail) {
+        setPopupNotification(e.detail);
+      }
+    };
+    window.addEventListener("app:show-notification", handleCustomEvent);
+    return () => {
+      setGlobalNotificationListener(null);
+      window.removeEventListener("app:show-notification", handleCustomEvent);
+    };
+  }, []);
 
   // 1. Initial configuration parse and auth observer
   useEffect(() => {
@@ -1204,30 +1236,10 @@ _Sistem Keuangan Otomatis Mateha Production_`;
           onGoToDashboard={handleClearShareProject}
           onNotify={triggerNotification}
         />
-        <AnimatePresence>
-          {notification && (
-            <motion.div
-              initial={{ opacity: 0, y: -45 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed top-18 right-4 z-50 max-w-sm w-full bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl p-4 flex items-start space-x-3"
-            >
-              {notification.type === "success" ? (
-                <div className="p-1 w-7 h-7 flex items-center justify-center bg-emerald-500/10 text-emerald-400 rounded-xl">
-                  <Check className="w-4 h-4" />
-                </div>
-              ) : (
-                <div className="p-1 w-7 h-7 flex items-center justify-center bg-rose-500/10 text-rose-400 rounded-xl">
-                  <AlertCircle className="w-4 h-4" />
-                </div>
-              )}
-              <div className="flex-1 text-left">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider text-[10px]">Notification</h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">{notification.text}</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <NotificationModal 
+          popup={popupNotification} 
+          onClose={() => setPopupNotification(null)} 
+        />
       </>
     );
   }
@@ -1495,31 +1507,11 @@ _Sistem Keuangan Otomatis Mateha Production_`;
         </AnimatePresence>
       </nav>
 
-      {/* FEEDBACK STATUS TOAST NOTIFICATION */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -45 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed top-18 right-4 z-50 max-w-sm w-full bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl p-4 flex items-start space-x-3"
-          >
-            {notification.type === "success" ? (
-              <div className="p-1 w-7 h-7 flex items-center justify-center bg-emerald-500/10 text-emerald-400 rounded-xl">
-                <Check className="w-4 h-4" />
-              </div>
-            ) : (
-              <div className="p-1 w-7 h-7 flex items-center justify-center bg-rose-500/10 text-rose-400 rounded-xl">
-                <AlertCircle className="w-4 h-4" />
-              </div>
-            )}
-            <div className="flex-1 text-left">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider text-[10px]">Notification</h3>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">{notification.text}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* GLOBAL POPUP MODAL NOTIFICATION */}
+      <NotificationModal 
+        popup={popupNotification} 
+        onClose={() => setPopupNotification(null)} 
+      />
 
       {/* CORE DISPLAY CANVAS */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -1827,31 +1819,31 @@ _Sistem Keuangan Otomatis Mateha Production_`;
 
         {activeTab === "finance" && (
           <div className="max-w-4xl mx-auto p-6 md:p-8 space-y-6">
-            <MatehaFinance projects={projects} />
+            <MatehaFinance projects={projects} onNotify={triggerNotification} />
           </div>
         )}
 
         {activeTab === "kwitansi" && (
           <div className="max-w-4xl mx-auto p-6 md:p-8 space-y-6">
-            <KwitansiView />
+            <KwitansiView onNotify={triggerNotification} />
           </div>
         )}
 
         {activeTab === "invoice" && (
           <div className="max-w-4xl mx-auto p-6 md:p-8 space-y-6">
-            <InvoiceView />
+            <InvoiceView onNotify={triggerNotification} />
           </div>
         )}
         
         {activeTab === "quotation" && (
           <div className="max-w-4xl mx-auto p-6 md:p-8 space-y-6">
-            <QuotationView />
+            <QuotationView onNotify={triggerNotification} />
           </div>
         )}
 
         {activeTab === "clients" && (
           <div className="max-w-5xl mx-auto p-6 md:p-8 space-y-6">
-            <ClientManagement />
+            <ClientManagement onNotify={triggerNotification} />
           </div>
         )}
         
@@ -2168,7 +2160,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
           <PayslipView
             projects={projects}
             currentUserProfile={userProfile}
-            onNotify={(msg) => triggerNotification(msg)}
+            onNotify={(msg, type) => triggerNotification(msg, type === "error" ? "error" : "success")}
           />
         )}
 
@@ -2185,7 +2177,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
         {activeTab === "users" && !!userProfile && (
           <UserManagement 
             currentUserId={user.uid} 
-            onNotify={(msg) => triggerNotification(msg)} 
+            onNotify={(msg, type) => triggerNotification(msg, type === "error" ? "error" : "success")} 
           />
         )}
 

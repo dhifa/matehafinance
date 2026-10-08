@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Quotation, formatRupiah } from "../types";
 import { generateQuotationPdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
+import { notify } from "../utils/notification";
 import { formatDateString } from "../utils/date";
 import { terbilang } from "../utils/numberToWords";
 import { Download, Printer, X, FileText, Loader2, Copy, Check, UserCheck, Trash2 } from "lucide-react";
@@ -38,7 +39,7 @@ export default function QuotationPreview({
       saveAs(blob, cleanFileName);
     } catch (err) {
       console.error("Error generating quotation PDF:", err);
-      alert("Gagal mengunduh PDF. Silakan coba lagi.");
+      notify.error("Gagal mengunduh PDF. Silakan coba lagi.", "Unduh Gagal");
     } finally {
       setIsExporting(false);
     }
@@ -454,7 +455,7 @@ export default function QuotationPreview({
                             <div className="text-center w-56 sm:w-64">
                               <p className="text-xs text-slate-600 mb-1">Disetujui & Diterima Oleh,</p>
                               <p className="text-xs font-bold text-slate-900 mb-2">Pihak Klien / Pemesan</p>
-                              <div className="h-20" />
+                              <div className="h-24" />
                               <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
                                 {quotation.clientApprovalName || quotation.customerContact || "( ................................... )"}
                               </p>
@@ -467,8 +468,8 @@ export default function QuotationPreview({
                             <div className="text-center w-56 sm:w-64">
                               <p className="text-xs text-slate-600 mb-1">Bandung, {formattedDate}</p>
                               <p className="text-xs font-bold text-slate-900 mb-2">Hormat Kami,</p>
-                              <div className="relative h-20 flex items-center justify-center">
-                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-36 max-h-20 object-contain mx-auto" />
+                              <div className="relative h-24 flex items-center justify-center">
+                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-48 max-h-24 object-contain mx-auto scale-125" />
                               </div>
                               <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
                                 Dhifa Aksa Hermawan
@@ -486,8 +487,8 @@ export default function QuotationPreview({
                             <div className="text-center w-60">
                               <p className="text-xs text-slate-600 mb-1">Bandung, {formattedDate}</p>
                               <p className="text-xs font-semibold text-slate-800 mb-2">Hormat Kami,</p>
-                              <div className="relative h-20 flex items-center justify-center">
-                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-36 max-h-20 object-contain mx-auto" />
+                              <div className="relative h-24 flex items-center justify-center">
+                                <img src="/logo-ttd.png" alt="Tanda Tangan CEO" className="w-48 max-h-24 object-contain mx-auto scale-125" />
                               </div>
                               <p className="font-extrabold text-slate-950 text-sm underline underline-offset-2">
                                 Dhifa Aksa Hermawan

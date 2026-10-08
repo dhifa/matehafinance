@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "firebase/firestore";
 import { db, sanitizeForFirestore } from "../utils/firebase";
 import { Invoice, InvoiceItem, formatRupiah, Bank, Client } from "../types";
-import { Plus, Trash2, Save, FileText, Eye, Download, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users, UserCheck } from "lucide-react";
+import { Plus, Trash2, Save, FileText, Eye, Download, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users, UserCheck, Coins, Percent } from "lucide-react";
 import InvoicePreview from "./InvoicePreview";
 import BankManagementModal from "./BankManagementModal";
 import ClientManagement from "./ClientManagement";
@@ -11,8 +11,24 @@ import { resolveClientDetails } from "../utils/clientHelper";
 import { bulkExport } from "../utils/bulkExport";
 import { generateInvoicePdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
+import { notify } from "../utils/notification";
 
-export default function InvoiceView() {
+interface InvoiceViewProps {
+  onNotify?: (text: string, type?: "success" | "error" | "warning" | "info", title?: string) => void;
+}
+
+export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
+  const showNotification = (
+    text: string,
+    type: "success" | "error" | "warning" | "info" = "success",
+    title?: string
+  ) => {
+    if (onNotify) {
+      onNotify(text, type, title);
+    } else {
+      notify[type === "error" ? "error" : type === "warning" ? "warning" : type === "info" ? "info" : "success"](text, title);
+    }
+  };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmInv, setDeleteConfirmInv] = useState<Invoice | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -45,6 +61,12 @@ export default function InvoiceView() {
   const [showClientApproval, setShowClientApproval] = useState(false);
   const [clientApprovalName, setClientApprovalName] = useState("");
   const [clientApprovalTitle, setClientApprovalTitle] = useState("");
+
+  // DP (Down Payment) states
+  const [isDp, setIsDp] = useState(false);
+  const [dpMode, setDpMode] = useState<"percentage" | "nominal">("percentage");
+  const [dpPercent, setDpPercent] = useState<number>(50);
+  const [dpAmountManual, setDpAmountManual] = useState<number>(0);
 
   // New item draft input
   const [newItem, setNewItem] = useState({ description: "", qty: 1, price: 0 });
@@ -100,7 +122,7 @@ export default function InvoiceView() {
 
   const addItem = () => {
     if (!newItem.description.trim() || newItem.price <= 0) {
-      alert("Mohon isi deskripsi item dan nominal harga yang valid.");
+      showNotification("Mohon isi deskripsi item dan nominal harga yang valid.", "warning", "Data Item Belum Lengkap");
       return;
     }
     const item: InvoiceItem = {
@@ -127,7 +149,7 @@ export default function InvoiceView() {
   const saveEditedItem = () => {
     if (editingItemIndex === null) return;
     if (!editItemDraft.description.trim() || editItemDraft.price <= 0) {
-      alert("Deskripsi dan harga item tidak boleh kosong.");
+      showNotification("Deskripsi dan harga item tidak boleh kosong.", "warning", "Data Item Belum Lengkap");
       return;
     }
     const updated = [...items];
@@ -235,6 +257,11 @@ export default function InvoiceView() {
     setShowClientApproval(!!inv.showClientApproval);
     setClientApprovalName(inv.clientApprovalName || "");
     setClientApprovalTitle(inv.clientApprovalTitle || "");
+    // DP state
+    setIsDp(!!inv.isDp);
+    setDpMode(inv.dpMode || "percentage");
+    setDpPercent(inv.dpPercent || 50);
+    setDpAmountManual(inv.dpAmount || (inv.isDp ? inv.grandTotal : 0));
     setEditingItemIndex(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -254,16 +281,46 @@ export default function InvoiceView() {
     setShowClientApproval(false);
     setClientApprovalName("");
     setClientApprovalTitle("");
+    setIsDp(false);
+    setDpMode("percentage");
+    setDpPercent(50);
+    setDpAmountManual(0);
     setEditingItemIndex(null);
   };
 
   const saveInvoice = async () => {
-    if (!customerName.trim() || items.length === 0) {
-      alert("Mohon isi Nama Klien dan minimal 1 item tagihan.");
+    if (!customerName.trim()) {
+      showNotification("Mohon isi Nama Klien / Perusahaan terlebih dahulu.", "warning", "Nama Klien Wajib Diisi");
+      return;
+    }
+    if (items.length === 0) {
+      showNotification("Mohon tambahkan minimal 1 item rincian tagihan.", "warning", "Item Tagihan Kosong");
       return;
     }
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
-    const grandTotal = items.reduce((sum, item) => sum + item.total, 0);
+    const subtotalItems = items.reduce((sum, item) => sum + item.total, 0);
+
+    const finalIsDp = !!isDp;
+    let finalGrandTotal = subtotalItems;
+    let finalDpPercent: number | undefined = undefined;
+    let finalDpAmount: number | undefined = undefined;
+    let finalTotalAmount: number | undefined = undefined;
+    let finalRemainingAmount: number | undefined = undefined;
+    let finalDpMode: "percentage" | "nominal" | undefined = undefined;
+
+    if (finalIsDp) {
+      finalDpMode = dpMode;
+      if (dpMode === "percentage") {
+        finalDpPercent = Math.max(1, Math.min(100, Number(dpPercent) || 50));
+        finalDpAmount = Math.round((subtotalItems * finalDpPercent) / 100);
+      } else {
+        finalDpAmount = Math.max(0, Math.min(subtotalItems, Number(dpAmountManual) || 0));
+        finalDpPercent = subtotalItems > 0 ? Number(((finalDpAmount / subtotalItems) * 100).toFixed(1)) : 0;
+      }
+      finalGrandTotal = finalDpAmount;
+      finalTotalAmount = subtotalItems;
+      finalRemainingAmount = Math.max(0, subtotalItems - finalDpAmount);
+    }
     
     try {
       if (editModeId) {
@@ -275,14 +332,20 @@ export default function InvoiceView() {
           date,
           dueDate,
           items,
-          grandTotal,
+          grandTotal: finalGrandTotal,
           selectedBanks,
           termsAndConditions: termsAndConditions.trim(),
           showClientApproval: !!showClientApproval,
           clientApprovalName: clientApprovalName.trim() || undefined,
           clientApprovalTitle: clientApprovalTitle.trim() || undefined,
+          isDp: finalIsDp,
+          dpMode: finalDpMode,
+          dpPercent: finalDpPercent,
+          dpAmount: finalDpAmount,
+          totalAmount: finalTotalAmount,
+          remainingAmount: finalRemainingAmount,
         });
-        alert(`Perubahan invoice ${editingInvoiceNumber || ""} berhasil disimpan!`);
+        showNotification(`Perubahan invoice ${editingInvoiceNumber || ""} berhasil disimpan!`, "success", "Perubahan Disimpan");
         cancelEdit();
       } else {
         const id = Date.now().toString();
@@ -297,7 +360,7 @@ export default function InvoiceView() {
           date,
           dueDate,
           items,
-          grandTotal,
+          grandTotal: finalGrandTotal,
           status: "draft",
           createdAt: new Date().toISOString(),
           selectedBanks,
@@ -305,9 +368,15 @@ export default function InvoiceView() {
           showClientApproval: !!showClientApproval,
           clientApprovalName: clientApprovalName.trim() || undefined,
           clientApprovalTitle: clientApprovalTitle.trim() || undefined,
+          isDp: finalIsDp,
+          dpMode: finalDpMode,
+          dpPercent: finalDpPercent,
+          dpAmount: finalDpAmount,
+          totalAmount: finalTotalAmount,
+          remainingAmount: finalRemainingAmount,
         };
         await setDoc(doc(db, "invoices", id), sanitizeForFirestore(newInvoice));
-        alert(`Faktur Invoice ${invoiceNumber} berhasil dibuat!`);
+        showNotification(`Faktur Invoice ${invoiceNumber} berhasil dibuat dan disimpan!`, "success", "Invoice Berhasil Diterbitkan");
         
         {/* If requested, save new client to database */}
         if (saveToClientDb && customerName.trim()) {
@@ -346,9 +415,9 @@ export default function InvoiceView() {
         setSaveToClientDb(false);
         setTermsAndConditions("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving invoice:", error);
-      alert("Gagal menyimpan invoice.");
+      showNotification("Gagal menyimpan invoice: " + (error?.message || "Kesalahan koneksi"), "error", "Gagal Menyimpan");
     }
   };
 
@@ -358,9 +427,9 @@ export default function InvoiceView() {
       const blob = await generateInvoicePdfBlob(inv);
       const cleanFileName = `Invoice_${inv.invoiceNumber.replace(/\//g, '_')}_${inv.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       saveAs(blob, cleanFileName);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error exporting invoice PDF:", err);
-      alert("Gagal mengunduh PDF. Silakan coba lagi.");
+      showNotification("Gagal mengunduh PDF. Silakan coba lagi.", "error", "Unduh Gagal");
     } finally {
       setDownloadingId(null);
     }
@@ -898,9 +967,270 @@ export default function InvoiceView() {
                 );
               })}
 
-              <div className="flex justify-between items-center px-4 py-3 bg-slate-900/95 rounded-xl border border-slate-700/80 mt-3">
-                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">TOTAL TAGIHAN:</span>
-                <span className="text-base font-extrabold text-blue-400 font-mono">{formatRupiah(grandTotalAll)}</span>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 py-3 bg-slate-900/95 rounded-xl border border-slate-700/80 mt-3 gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    {isDp ? "TOTAL YANG DITAGIHKAN (DP):" : "TOTAL TAGIHAN:"}
+                  </span>
+                  {isDp && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                      DP {dpMode === "percentage" ? `${dpPercent}%` : `${grandTotalAll > 0 ? ((dpAmountManual / grandTotalAll) * 100).toFixed(1) : 0}%`}
+                    </span>
+                  )}
+                </div>
+                <div className="text-left sm:text-right">
+                  <span className="text-base font-extrabold text-blue-400 font-mono">
+                    {formatRupiah(isDp ? (dpMode === "percentage" ? Math.round((grandTotalAll * (dpPercent || 50)) / 100) : Math.min(grandTotalAll, dpAmountManual || 0)) : grandTotalAll)}
+                  </span>
+                  {isDp && (
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Total Kontrak: {formatRupiah(grandTotalAll)} • Sisa: {formatRupiah(Math.max(0, grandTotalAll - (dpMode === "percentage" ? Math.round((grandTotalAll * (dpPercent || 50)) / 100) : Math.min(grandTotalAll, dpAmountManual || 0))))}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* PENGATURAN INVOICE UANG MUKA / DP */}
+        <div className="bg-slate-950/70 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-950/60 border border-amber-800/50 text-amber-400">
+                <Coins className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Pengaturan Uang Muka / Invoice DP (Down Payment)
+                  </h3>
+                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                    Fitur DP
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Terbitkan invoice DP dengan kalkulasi otomatis persentase (%) atau input manual oleh pengguna (Rp)
+                </p>
+              </div>
+            </div>
+
+            <label className="relative inline-flex items-center cursor-pointer self-start sm:self-auto">
+              <input
+                type="checkbox"
+                checked={isDp}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setIsDp(val);
+                  if (val && dpAmountManual === 0 && grandTotalAll > 0) {
+                    setDpAmountManual(Math.round((grandTotalAll * (dpPercent || 50)) / 100));
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+              <span className="ml-2.5 text-xs font-semibold text-slate-300">
+                {isDp ? "Invoice DP Aktif" : "Bukan DP (Tagihan Penuh)"}
+              </span>
+            </label>
+          </div>
+
+          {isDp && (
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-amber-900/40 space-y-4">
+              {/* Pilihan Metode: Auto (%) vs By User / Manual (Rp) */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                <span className="text-xs font-semibold text-slate-300">Metode Penentuan Nilai DP:</span>
+                <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setDpMode("percentage")}
+                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      dpMode === "percentage"
+                        ? "bg-amber-600 text-white shadow-md shadow-amber-950"
+                        : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Percent className="w-3.5 h-3.5" />
+                    <span>Hitung Auto (%)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDpMode("nominal");
+                      if (!dpAmountManual && grandTotalAll > 0) {
+                        setDpAmountManual(Math.round((grandTotalAll * (dpPercent || 50)) / 100));
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      dpMode === "nominal"
+                        ? "bg-amber-600 text-white shadow-md shadow-amber-950"
+                        : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>By User (Nominal Rp)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mode Auto: Persentase */}
+              {dpMode === "percentage" ? (
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs font-semibold text-slate-300">
+                      Pilih Persentase Cepat atau Ketik %:
+                    </label>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[20, 30, 40, 50, 70].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => {
+                            setDpPercent(pct);
+                            setDpAmountManual(Math.round((grandTotalAll * pct) / 100));
+                          }}
+                          className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold transition cursor-pointer ${
+                            dpPercent === pct
+                              ? "bg-amber-500 text-slate-950 ring-2 ring-amber-400"
+                              : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                          }`}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1 max-w-[200px]">
+                      <input
+                        type="number"
+                        min="1"
+                        max="99"
+                        value={dpPercent || ""}
+                        onChange={(e) => {
+                          const val = Math.max(1, Math.min(99, Number(e.target.value) || 0));
+                          setDpPercent(val);
+                          setDpAmountManual(Math.round((grandTotalAll * val) / 100));
+                        }}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-amber-500 pr-8"
+                        placeholder="50"
+                      />
+                      <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Otomatis dihitung: <strong className="text-amber-400 font-mono">{formatRupiah(Math.round((grandTotalAll * (dpPercent || 50)) / 100))}</strong>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Mode By User: Nominal Manual */
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs font-semibold text-slate-300">
+                      Ketik Nominal DP Bebas (Rupiah):
+                    </label>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[25, 50, 75].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => {
+                            const amt = Math.round((grandTotalAll * pct) / 100);
+                            setDpAmountManual(amt);
+                            setDpPercent(pct);
+                          }}
+                          className="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                        >
+                          Set {pct}% ({formatRupiah(Math.round((grandTotalAll * pct) / 100))})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-2 text-xs font-bold text-slate-500 font-mono">Rp</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max={grandTotalAll}
+                        value={dpAmountManual || ""}
+                        onChange={(e) => {
+                          const val = Math.max(0, Number(e.target.value) || 0);
+                          setDpAmountManual(val);
+                          if (grandTotalAll > 0) {
+                            setDpPercent(Number(((val / grandTotalAll) * 100).toFixed(1)));
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-amber-500"
+                        placeholder="Contoh: 5000000"
+                      />
+                    </div>
+                    <div className="bg-slate-950/80 px-3 py-2 rounded-lg border border-slate-800 text-xs text-slate-300 flex items-center justify-between sm:justify-start gap-2">
+                      <span>Setara:</span>
+                      <strong className="text-amber-400 font-mono">
+                        {grandTotalAll > 0 ? ((dpAmountManual / grandTotalAll) * 100).toFixed(1) : 0}% dari total
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Rangkuman Live Perhitungan DP */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Total Nilai Kontrak / Item</p>
+                  <p className="text-sm font-extrabold text-white font-mono mt-0.5">{formatRupiah(grandTotalAll)}</p>
+                </div>
+                <div className="bg-amber-950/40 p-3 rounded-xl border border-amber-800/60">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-amber-300 uppercase font-bold">Tagihan DP Faktur Ini</p>
+                    <span className="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 px-1.5 rounded">
+                      {dpMode === "percentage" ? `${dpPercent}%` : `${grandTotalAll > 0 ? ((dpAmountManual / grandTotalAll) * 100).toFixed(1) : 0}%`}
+                    </span>
+                  </div>
+                  <p className="text-sm font-extrabold text-amber-400 font-mono mt-0.5">
+                    {formatRupiah(dpMode === "percentage" ? Math.round((grandTotalAll * (dpPercent || 50)) / 100) : Math.min(grandTotalAll, dpAmountManual || 0))}
+                  </p>
+                </div>
+                <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Sisa Pelunasan Nanti</p>
+                  <p className="text-sm font-extrabold text-slate-300 font-mono mt-0.5">
+                    {formatRupiah(Math.max(0, grandTotalAll - (dpMode === "percentage" ? Math.round((grandTotalAll * (dpPercent || 50)) / 100) : Math.min(grandTotalAll, dpAmountManual || 0))))}
+                  </p>
+                </div>
+              </div>
+
+              {/* Bantuan Otomasi Teks */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+                <span className="text-[11px] text-slate-400">Bantuan Teks Otomatis:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentDpAmt = dpMode === "percentage" ? Math.round((grandTotalAll * (dpPercent || 50)) / 100) : Math.min(grandTotalAll, dpAmountManual || 0);
+                    const currentRemaining = Math.max(0, grandTotalAll - currentDpAmt);
+                    const currentPct = dpMode === "percentage" ? dpPercent : (grandTotalAll > 0 ? ((currentDpAmt / grandTotalAll) * 100).toFixed(0) : 0);
+                    setTermsAndConditions(
+                      `Pembayaran Uang Muka (DP ${currentPct}%) sebesar ${formatRupiah(currentDpAmt)} wajib dibayarkan selambat-lambatnya sesuai tanggal jatuh tempo. Sisa pelunasan sebesar ${formatRupiah(currentRemaining)} dibayarkan selambat-lambatnya pada saat H-1 acara.`
+                    );
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold transition cursor-pointer border border-slate-700"
+                >
+                  Salin Syarat Pembayaran DP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentPct = dpMode === "percentage" ? dpPercent : (grandTotalAll > 0 ? Math.round((dpAmountManual / grandTotalAll) * 100) : 0);
+                    const cleanSubj = subject.replace(/^Tagihan Uang Muka \(DP [^)]+\) - /, "").replace(/^Tagihan Uang Muka \(DP\) - /, "");
+                    setSubject(`Tagihan Uang Muka (DP ${currentPct}%) - ${cleanSubj || "Layanan Event"}`);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs font-semibold transition cursor-pointer border border-slate-700"
+                >
+                  Set Subjek: Tagihan Uang Muka (DP)
+                </button>
               </div>
             </div>
           )}
@@ -1081,6 +1411,11 @@ export default function InvoiceView() {
                         <span className="font-bold text-white text-sm">{inv.invoiceNumber}</span>
                         <span className="text-slate-400">•</span>
                         <span className="font-semibold text-blue-300 text-sm">{inv.customerName}</span>
+                        {inv.isDp && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide bg-amber-500/25 text-amber-300 border border-amber-500/40 font-mono">
+                            DP {inv.dpPercent ? `(${inv.dpPercent}%)` : ''}
+                          </span>
+                        )}
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${
                           inv.status === "paid" 
                             ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" 
@@ -1095,7 +1430,15 @@ export default function InvoiceView() {
                       <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                         <span>Tanggal: {inv.date}</span>
                         {inv.subject && <span>| {inv.subject}</span>}
-                        <span>| Total: <strong className="text-slate-200 font-mono">{formatRupiah(inv.grandTotal)}</strong></span>
+                        {inv.isDp ? (
+                          <>
+                            <span>| Tagihan DP: <strong className="text-amber-300 font-mono">{formatRupiah(inv.grandTotal)}</strong></span>
+                            {inv.totalAmount && <span>| Kontrak: <strong className="text-slate-300 font-mono">{formatRupiah(inv.totalAmount)}</strong></span>}
+                            {inv.remainingAmount !== undefined && <span>| Sisa: <strong className="text-slate-400 font-mono">{formatRupiah(inv.remainingAmount)}</strong></span>}
+                          </>
+                        ) : (
+                          <span>| Total: <strong className="text-slate-200 font-mono">{formatRupiah(inv.grandTotal)}</strong></span>
+                        )}
                         {inv.dueDate && <span className="text-rose-400">| Jatuh Tempo: {inv.dueDate}</span>}
                       </div>
                     </div>

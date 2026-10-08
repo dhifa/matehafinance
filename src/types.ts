@@ -100,6 +100,13 @@ export interface Invoice {
   showClientApproval?: boolean;
   clientApprovalName?: string;
   clientApprovalTitle?: string;
+  // DP (Down Payment / Uang Muka)
+  isDp?: boolean;
+  dpMode?: "percentage" | "nominal";
+  dpPercent?: number;
+  dpAmount?: number;
+  totalAmount?: number;
+  remainingAmount?: number;
 }
 
 export interface SharingRatio {

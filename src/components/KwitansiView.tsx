@@ -19,6 +19,7 @@ import { resolveClientDetails } from "../utils/clientHelper";
 import { generateKwitansiItemPdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
 import { terbilang } from "../utils/numberToWords";
+import { notify } from "../utils/notification";
 import { 
   Receipt, 
   Plus, 
@@ -40,7 +41,11 @@ import {
   Edit2
 } from "lucide-react";
 
-export default function KwitansiView() {
+interface KwitansiViewProps {
+  onNotify?: (text: string, type?: "success" | "error" | "warning" | "info", title?: string) => void;
+}
+
+export default function KwitansiView({ onNotify }: KwitansiViewProps = {}) {
   const [kwitansiList, setKwitansiList] = useState<Kwitansi[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
@@ -121,9 +126,14 @@ export default function KwitansiView() {
     };
   }, []);
 
-  const triggerNotification = (msg: string) => {
+  const triggerNotification = (msg: string, type: "success" | "error" | "info" = "success") => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3500);
+    if (onNotify) {
+      onNotify(msg, type, type === "error" ? "Gagal" : "Kwitansi");
+    } else {
+      notify[type === "error" ? "error" : "success"](msg, type === "error" ? "Gagal" : "Kwitansi");
+    }
   };
 
   // Generate sequential Kwitansi Number
@@ -251,10 +261,10 @@ export default function KwitansiView() {
       setSaveToClientDb(false);
       setDate(new Date().toISOString().split("T")[0]);
 
-      triggerNotification(`Kwitansi resmi ${kwitansiNumber} berhasil diterbitkan!`);
+      triggerNotification(`Kwitansi resmi ${kwitansiNumber} berhasil diterbitkan!`, "success");
     } catch (err: any) {
       console.error(err);
-      triggerNotification("Gagal menyimpan kwitansi: " + err.message);
+      triggerNotification("Gagal menyimpan kwitansi: " + err.message, "error");
     } finally {
       setSaving(false);
     }
@@ -264,10 +274,10 @@ export default function KwitansiView() {
     try {
       await deleteDoc(doc(db, "kwitansi", id));
       setShowDeleteConfirmId(null);
-      triggerNotification("Kwitansi berhasil dihapus.");
+      triggerNotification("Kwitansi berhasil dihapus.", "success");
     } catch (err: any) {
       console.error(err);
-      triggerNotification("Gagal menghapus kwitansi: " + err.message);
+      triggerNotification("Gagal menghapus kwitansi: " + err.message, "error");
     }
   };
 

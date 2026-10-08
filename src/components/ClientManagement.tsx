@@ -3,6 +3,7 @@ import { Client } from "../types";
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from "firebase/firestore";
 import { db, sanitizeForFirestore } from "../utils/firebase";
 import { resolveClientDetails } from "../utils/clientHelper";
+import { notify } from "../utils/notification";
 import { 
   Users, 
   Plus, 
@@ -29,6 +30,7 @@ interface ClientManagementProps {
   isOpen?: boolean;
   onClose?: () => void;
   onSelectClient?: (client: Client) => void;
+  onNotify?: (text: string, type?: "success" | "error" | "warning" | "info", title?: string) => void;
 }
 
 export default function ClientManagement({
@@ -36,7 +38,19 @@ export default function ClientManagement({
   isOpen = true,
   onClose,
   onSelectClient,
+  onNotify,
 }: ClientManagementProps) {
+  const showNotification = (
+    text: string,
+    type: "success" | "error" | "warning" | "info" = "success",
+    title?: string
+  ) => {
+    if (onNotify) {
+      onNotify(text, type, title);
+    } else {
+      notify[type === "error" ? "error" : type === "warning" ? "warning" : type === "info" ? "info" : "success"](text, title);
+    }
+  };
   const [clients, setClients] = useState<Client[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -110,12 +124,10 @@ export default function ClientManagement({
         name: newCompany || newPic,
         updatedAt: new Date().toISOString(),
       }));
-      setSuccessMsg(`Posisi Perusahaan & PIC untuk "${newCompany || newPic}" berhasil ditukar!`);
-      setTimeout(() => setSuccessMsg(""), 3000);
+      showNotification(`Posisi Perusahaan & PIC untuk "${newCompany || newPic}" berhasil ditukar!`, "success", "Database Klien");
     } catch (err: any) {
       console.error("Gagal menukar posisi:", err);
-      setErrorMsg("Gagal menukar posisi: " + (err.message || "Error"));
-      setTimeout(() => setErrorMsg(""), 3000);
+      showNotification("Gagal menukar posisi: " + (err.message || "Error"), "error", "Gagal Menukar Posisi");
     }
   };
 
@@ -123,7 +135,7 @@ export default function ClientManagement({
     e.preventDefault();
     const primaryName = (company.trim() || pic.trim());
     if (!primaryName) {
-      setErrorMsg("Mohon isi minimal Nama Perusahaan/Instansi atau Nama PIC.");
+      showNotification("Mohon isi minimal Nama Perusahaan/Instansi atau Nama PIC.", "warning", "Data Belum Lengkap");
       return;
     }
 
@@ -147,8 +159,7 @@ export default function ClientManagement({
       if (notes.trim()) clientData.notes = notes.trim();
 
       await setDoc(doc(db, "clients", id), sanitizeForFirestore(clientData));
-      setSuccessMsg(editingId ? "Data klien berhasil diperbarui!" : "Klien baru berhasil ditambahkan!");
-      setTimeout(() => setSuccessMsg(""), 3000);
+      showNotification(editingId ? "Data klien berhasil diperbarui!" : "Klien baru berhasil ditambahkan!", "success", "Database Klien");
       resetForm();
 
       if (onSelectClient) {
@@ -156,7 +167,7 @@ export default function ClientManagement({
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg("Gagal menyimpan data klien: " + (err.message || "Error"));
+      showNotification("Gagal menyimpan data klien: " + (err.message || "Error"), "error", "Gagal Menyimpan");
     } finally {
       setSaving(false);
     }
@@ -165,10 +176,11 @@ export default function ClientManagement({
   const handleDelete = async (id: string) => {
     try {
       await deleteDoc(doc(db, "clients", id));
+      showNotification("Data klien berhasil dihapus!", "success", "Database Klien");
       if (editingId === id) resetForm();
       setConfirmDeleteId(null);
     } catch (err: any) {
-      setErrorMsg("Gagal menghapus klien: " + err.message);
+      showNotification("Gagal menghapus klien: " + err.message, "error", "Gagal Menghapus");
     }
   };
 

@@ -10,8 +10,24 @@ import ClientSelector from "./ClientSelector";
 import { resolveClientDetails } from "../utils/clientHelper";
 import { generateQuotationPdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
+import { notify } from "../utils/notification";
 
-export default function QuotationView() {
+interface QuotationViewProps {
+  onNotify?: (text: string, type?: "success" | "error" | "warning" | "info", title?: string) => void;
+}
+
+export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
+  const showNotification = (
+    text: string,
+    type: "success" | "error" | "warning" | "info" = "success",
+    title?: string
+  ) => {
+    if (onNotify) {
+      onNotify(text, type, title);
+    } else {
+      notify[type === "error" ? "error" : type === "warning" ? "warning" : type === "info" ? "info" : "success"](text, title);
+    }
+  };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmQuo, setDeleteConfirmQuo] = useState<Quotation | null>(null);
   const [acceptConfirmQuo, setAcceptConfirmQuo] = useState<Quotation | null>(null);
@@ -98,7 +114,7 @@ export default function QuotationView() {
 
   const addItem = () => {
     if (!newItem.description.trim() || newItem.price <= 0) {
-      alert("Mohon isi deskripsi item dan harga satuan yang valid.");
+      showNotification("Mohon isi deskripsi item dan harga satuan yang valid.", "warning", "Data Item Belum Lengkap");
       return;
     }
     const item: QuotationItem = {
@@ -125,7 +141,7 @@ export default function QuotationView() {
   const saveEditedItem = () => {
     if (editingItemIndex === null) return;
     if (!editItemDraft.description.trim() || editItemDraft.price <= 0) {
-      alert("Deskripsi dan harga tidak boleh kosong.");
+      showNotification("Deskripsi dan harga tidak boleh kosong.", "warning", "Data Item Belum Lengkap");
       return;
     }
     const updated = [...items];
@@ -190,8 +206,12 @@ export default function QuotationView() {
   };
 
   const saveQuotation = async () => {
-    if (!customerName.trim() || items.length === 0) {
-      alert("Mohon isi Nama Klien dan minimal 1 item rincian penawaran.");
+    if (!customerName.trim()) {
+      showNotification("Mohon isi Nama Klien / Perusahaan terlebih dahulu.", "warning", "Nama Klien Wajib Diisi");
+      return;
+    }
+    if (items.length === 0) {
+      showNotification("Mohon tambahkan minimal 1 item rincian penawaran.", "warning", "Rincian Item Kosong");
       return;
     }
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
@@ -214,7 +234,7 @@ export default function QuotationView() {
           clientApprovalName: clientApprovalName.trim() || undefined,
           clientApprovalTitle: clientApprovalTitle.trim() || undefined,
         });
-        alert(`Perubahan penawaran ${editingQuotationNumber || ""} berhasil disimpan!`);
+        showNotification(`Perubahan penawaran ${editingQuotationNumber || ""} berhasil disimpan!`, "success", "Perubahan Disimpan");
         cancelEdit();
       } else {
         const id = Date.now().toString();
@@ -239,7 +259,7 @@ export default function QuotationView() {
           clientApprovalTitle: clientApprovalTitle.trim() || undefined,
         };
         await setDoc(doc(db, "quotations", id), sanitizeForFirestore(newQuotation));
-        alert(`Surat Penawaran ${quotationNumber} berhasil dibuat!`);
+        showNotification(`Surat Penawaran ${quotationNumber} berhasil dibuat dan disimpan!`, "success", "Penawaran Berhasil Dibuat");
         
         {/* If requested, save new client to database */}
         if (saveToClientDb && customerName.trim()) {
@@ -281,9 +301,9 @@ export default function QuotationView() {
         setClientApprovalName("");
         setClientApprovalTitle("");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving quotation:", error);
-      alert("Gagal menyimpan penawaran.");
+      showNotification("Gagal menyimpan penawaran: " + (error?.message || "Kesalahan koneksi"), "error", "Gagal Menyimpan");
     }
   };
 
@@ -386,9 +406,9 @@ export default function QuotationView() {
       const blob = await generateQuotationPdfBlob(quo);
       const cleanFileName = `Quotation_${quo.quotationNumber.replace(/\//g, '_')}_${quo.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       saveAs(blob, cleanFileName);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error exporting quotation PDF:", err);
-      alert("Gagal mengunduh PDF. Silakan coba lagi.");
+      showNotification("Gagal mengunduh PDF. Silakan coba lagi.", "error", "Unduh Gagal");
     } finally {
       setDownloadingId(null);
     }
