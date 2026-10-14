@@ -210,30 +210,95 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
       showNotification("Mohon isi Nama Klien / Perusahaan terlebih dahulu.", "warning", "Nama Klien Wajib Diisi");
       return;
     }
-    if (items.length === 0) {
+
+    // Auto-commit active inline item edit
+    let currentItems = [...items];
+    if (editingItemIndex !== null && editItemDraft.description.trim() && editItemDraft.price > 0) {
+      const qty = editItemDraft.qty || 1;
+      const price = editItemDraft.price || 0;
+      currentItems[editingItemIndex] = {
+        ...currentItems[editingItemIndex],
+        description: editItemDraft.description.trim(),
+        qty,
+        price,
+        total: qty * price,
+      };
+      setItems(currentItems);
+      setEditingItemIndex(null);
+    }
+
+    if (currentItems.length === 0) {
       showNotification("Mohon tambahkan minimal 1 item rincian penawaran.", "warning", "Rincian Item Kosong");
       return;
     }
+
+    const sanitizedItems = currentItems.map((item, idx) => ({
+      id: item.id || `quo_item_${idx}_${Date.now()}`,
+      description: (item.description || "").trim(),
+      qty: Number(item.qty) || 1,
+      price: Number(item.price) || 0,
+      total: (Number(item.qty) || 1) * (Number(item.price) || 0)
+    }));
+
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
-    const grandTotal = items.reduce((sum, item) => sum + item.total, 0);
+    const grandTotal = sanitizedItems.reduce((sum, item) => sum + item.total, 0);
     
     try {
       if (editModeId) {
-        await updateDoc(doc(db, "quotations", editModeId), {
+        const existingQuo = quotations.find(q => q.id === editModeId);
+        const finalBanks = selectedBanks.length > 0 ? selectedBanks : (existingQuo?.selectedBanks || []);
+
+        const updatedQuotation: Quotation = {
+          id: editModeId,
+          quotationNumber: editingQuotationNumber || existingQuo?.quotationNumber || generateQuotationNumber(),
           customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          customerContact: customerContact.trim(),
+          customerPhone: customerPhone.trim() || undefined,
+          customerContact: customerContact.trim() || undefined,
           subject: subject.trim() || "Penawaran Kerjasama Acara",
           date,
           validUntil,
-          items,
+          items: sanitizedItems,
           grandTotal,
-          selectedBanks,
+          status: existingQuo?.status || "draft",
+          createdAt: existingQuo?.createdAt || new Date().toISOString(),
+          selectedBanks: finalBanks,
           termsAndConditions: termsAndConditions.trim(),
           showClientApproval: !!showClientApproval,
-          clientApprovalName: clientApprovalName.trim() || undefined,
-          clientApprovalTitle: clientApprovalTitle.trim() || undefined,
-        });
+          clientApprovalName: (showClientApproval && clientApprovalName.trim()) ? clientApprovalName.trim() : undefined,
+          clientApprovalTitle: (showClientApproval && clientApprovalTitle.trim()) ? clientApprovalTitle.trim() : undefined,
+        };
+
+        await setDoc(doc(db, "quotations", editModeId), sanitizeForFirestore(updatedQuotation));
+
+        if (selectedQuotation && selectedQuotation.id === editModeId) {
+          setSelectedQuotation(updatedQuotation);
+        }
+
+        // If requested, save new client to database
+        if (saveToClientDb && customerName.trim()) {
+          const clientExists = clients.some(c => {
+            const d = resolveClientDetails(c);
+            return (
+              d.company.toLowerCase() === customerName.trim().toLowerCase() ||
+              c.name.toLowerCase() === customerName.trim().toLowerCase() ||
+              (c.company && c.company.toLowerCase() === customerName.trim().toLowerCase())
+            );
+          });
+          if (!clientExists) {
+            const clientId = "client_" + Date.now();
+            const clientDoc: Partial<Client> = {
+              id: clientId,
+              name: customerName.trim(),
+              company: customerName.trim(),
+              pic: customerContact.trim() || undefined,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            if (customerPhone.trim()) clientDoc.phone = customerPhone.trim();
+            await setDoc(doc(db, "clients", clientId), sanitizeForFirestore(clientDoc));
+          }
+        }
+
         showNotification(`Perubahan penawaran ${editingQuotationNumber || ""} berhasil disimpan!`, "success", "Perubahan Disimpan");
         cancelEdit();
       } else {
@@ -342,6 +407,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
     setClientApprovalName("");
     setClientApprovalTitle("");
     setEditingItemIndex(null);
+    setSaveToClientDb(false);
   };
 
   const handleDeleteSingle = (quo: Quotation) => {

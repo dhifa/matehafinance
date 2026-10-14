@@ -286,6 +286,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     setDpPercent(50);
     setDpAmountManual(0);
     setEditingItemIndex(null);
+    setSaveToClientDb(false);
   };
 
   const saveInvoice = async () => {
@@ -293,12 +294,38 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
       showNotification("Mohon isi Nama Klien / Perusahaan terlebih dahulu.", "warning", "Nama Klien Wajib Diisi");
       return;
     }
-    if (items.length === 0) {
+
+    // Auto-commit any currently active inline item edit
+    let currentItems = [...items];
+    if (editingItemIndex !== null && editItemDraft.description.trim() && editItemDraft.price > 0) {
+      const qty = editItemDraft.qty || 1;
+      const price = editItemDraft.price || 0;
+      currentItems[editingItemIndex] = {
+        ...currentItems[editingItemIndex],
+        description: editItemDraft.description.trim(),
+        qty,
+        price,
+        total: qty * price,
+      };
+      setItems(currentItems);
+      setEditingItemIndex(null);
+    }
+
+    if (currentItems.length === 0) {
       showNotification("Mohon tambahkan minimal 1 item rincian tagihan.", "warning", "Item Tagihan Kosong");
       return;
     }
+
+    const sanitizedItems = currentItems.map((item, idx) => ({
+      id: item.id || `item_${idx}_${Date.now()}`,
+      description: (item.description || "").trim(),
+      qty: Number(item.qty) || 1,
+      price: Number(item.price) || 0,
+      total: (Number(item.qty) || 1) * (Number(item.price) || 0)
+    }));
+
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
-    const subtotalItems = items.reduce((sum, item) => sum + item.total, 0);
+    const subtotalItems = sanitizedItems.reduce((sum, item) => sum + item.total, 0);
 
     const finalIsDp = !!isDp;
     let finalGrandTotal = subtotalItems;
@@ -324,27 +351,67 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     
     try {
       if (editModeId) {
-        await updateDoc(doc(db, "invoices", editModeId), {
+        const existingInv = invoices.find(inv => inv.id === editModeId);
+        const finalBanks = selectedBanks.length > 0 ? selectedBanks : (existingInv?.selectedBanks || []);
+
+        const updatedInvoice: Invoice = {
+          id: editModeId,
+          invoiceNumber: editingInvoiceNumber || existingInv?.invoiceNumber || generateInvoiceNumber(),
           customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          customerContact: customerContact.trim(),
+          customerPhone: customerPhone.trim() || undefined,
+          customerContact: customerContact.trim() || undefined,
           subject: subject.trim() || "Tagihan Layanan Event",
           date,
-          dueDate,
-          items,
+          dueDate: dueDate || "",
+          items: sanitizedItems,
           grandTotal: finalGrandTotal,
-          selectedBanks,
+          status: existingInv?.status || "draft",
+          createdAt: existingInv?.createdAt || new Date().toISOString(),
+          selectedBanks: finalBanks,
           termsAndConditions: termsAndConditions.trim(),
+          notes: existingInv?.notes || undefined,
           showClientApproval: !!showClientApproval,
-          clientApprovalName: clientApprovalName.trim() || undefined,
-          clientApprovalTitle: clientApprovalTitle.trim() || undefined,
+          clientApprovalName: (showClientApproval && clientApprovalName.trim()) ? clientApprovalName.trim() : undefined,
+          clientApprovalTitle: (showClientApproval && clientApprovalTitle.trim()) ? clientApprovalTitle.trim() : undefined,
           isDp: finalIsDp,
-          dpMode: finalDpMode,
-          dpPercent: finalDpPercent,
-          dpAmount: finalDpAmount,
-          totalAmount: finalTotalAmount,
-          remainingAmount: finalRemainingAmount,
-        });
+          dpMode: finalIsDp ? finalDpMode : undefined,
+          dpPercent: finalIsDp ? finalDpPercent : undefined,
+          dpAmount: finalIsDp ? finalDpAmount : undefined,
+          totalAmount: finalIsDp ? finalTotalAmount : undefined,
+          remainingAmount: finalIsDp ? finalRemainingAmount : undefined,
+        };
+
+        await setDoc(doc(db, "invoices", editModeId), sanitizeForFirestore(updatedInvoice));
+
+        if (selectedInvoice && selectedInvoice.id === editModeId) {
+          setSelectedInvoice(updatedInvoice);
+        }
+
+        // If requested, save new client to database
+        if (saveToClientDb && customerName.trim()) {
+          const clientExists = clients.some(c => {
+            const d = resolveClientDetails(c);
+            return (
+              d.company.toLowerCase() === customerName.trim().toLowerCase() ||
+              c.name.toLowerCase() === customerName.trim().toLowerCase() ||
+              (c.company && c.company.toLowerCase() === customerName.trim().toLowerCase())
+            );
+          });
+          if (!clientExists) {
+            const clientId = "client_" + Date.now();
+            const clientDoc: Partial<Client> = {
+              id: clientId,
+              name: customerName.trim(),
+              company: customerName.trim(),
+              pic: customerContact.trim() || undefined,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            if (customerPhone.trim()) clientDoc.phone = customerPhone.trim();
+            await setDoc(doc(db, "clients", clientId), sanitizeForFirestore(clientDoc));
+          }
+        }
+
         showNotification(`Perubahan invoice ${editingInvoiceNumber || ""} berhasil disimpan!`, "success", "Perubahan Disimpan");
         cancelEdit();
       } else {
@@ -354,26 +421,26 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
           id,
           invoiceNumber,
           customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          customerContact: customerContact.trim(),
+          customerPhone: customerPhone.trim() || undefined,
+          customerContact: customerContact.trim() || undefined,
           subject: subject.trim() || "Tagihan Layanan Event",
           date,
-          dueDate,
-          items,
+          dueDate: dueDate || "",
+          items: sanitizedItems,
           grandTotal: finalGrandTotal,
           status: "draft",
           createdAt: new Date().toISOString(),
           selectedBanks,
           termsAndConditions: termsAndConditions.trim(),
           showClientApproval: !!showClientApproval,
-          clientApprovalName: clientApprovalName.trim() || undefined,
-          clientApprovalTitle: clientApprovalTitle.trim() || undefined,
+          clientApprovalName: (showClientApproval && clientApprovalName.trim()) ? clientApprovalName.trim() : undefined,
+          clientApprovalTitle: (showClientApproval && clientApprovalTitle.trim()) ? clientApprovalTitle.trim() : undefined,
           isDp: finalIsDp,
-          dpMode: finalDpMode,
-          dpPercent: finalDpPercent,
-          dpAmount: finalDpAmount,
-          totalAmount: finalTotalAmount,
-          remainingAmount: finalRemainingAmount,
+          dpMode: finalIsDp ? finalDpMode : undefined,
+          dpPercent: finalIsDp ? finalDpPercent : undefined,
+          dpAmount: finalIsDp ? finalDpAmount : undefined,
+          totalAmount: finalIsDp ? finalTotalAmount : undefined,
+          remainingAmount: finalIsDp ? finalRemainingAmount : undefined,
         };
         await setDoc(doc(db, "invoices", id), sanitizeForFirestore(newInvoice));
         showNotification(`Faktur Invoice ${invoiceNumber} berhasil dibuat dan disimpan!`, "success", "Invoice Berhasil Diterbitkan");
