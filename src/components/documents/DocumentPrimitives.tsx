@@ -520,7 +520,10 @@ export function NoticeBox({ children, tone = "warn" }: { children: React.ReactNo
 // Signatures
 // ---------------------------------------------------------------------------
 
-const SIGN_SPACE = 76;
+const SIGN_SPACE = 100;
+// The signature artwork only fills ~2/3 of its square PNG, so draw it larger
+// than the signing space and let it overlap the signature line slightly.
+const SIGN_IMAGE_SIZE = 150;
 
 function SignatureColumn({
   caption,
@@ -544,7 +547,7 @@ function SignatureColumn({
           <img
             src={COMPANY.signature}
             alt="Tanda tangan"
-            style={{ height: SIGN_SPACE + 12, width: SIGN_SPACE + 12, objectFit: "contain", display: "block" }}
+            style={{ height: SIGN_IMAGE_SIZE, width: SIGN_IMAGE_SIZE, objectFit: "contain", display: "block", flexShrink: 0, position: "relative", top: -8 }}
           />
         )}
       </div>
