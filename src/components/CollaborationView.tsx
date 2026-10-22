@@ -292,52 +292,68 @@ export default function CollaborationView({
     0
   );
 
+  const renderPic = (notes?: string) => {
+    const noteVal = (notes || "").trim();
+    const matched = teamMembers.find(
+      (m) =>
+        m.username.toLowerCase() === noteVal.toLowerCase() ||
+        (m.displayName && m.displayName.toLowerCase() === noteVal.toLowerCase())
+    );
+    return (
+      <span className="inline-flex max-w-full items-center gap-1.5 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full text-[11px] whitespace-nowrap">
+        {matched && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />}
+        <span className={`truncate ${matched ? "text-cyan-100 font-semibold" : "text-slate-300"}`}>
+          {matched ? matched.displayName || matched.username : noteVal || "-"}
+        </span>
+      </span>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#080a0f] text-slate-100 font-sans selection:bg-cyan-500/20 selection:text-white">
       
-      {/* Dynamic Header Space */}
-      <header className="border-b border-slate-900 bg-[#0c0e12]/80 backdrop-blur-xl py-4 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
-              <Users className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-slate-500">KOLABORASI REALISASI RAB</span>
-              <h1 className="text-xs font-bold font-mono tracking-tight text-white uppercase">MATEHA LAPORAN REALISASI BIAYA</h1>
+      {/* Header */}
+      <header className="border-b border-slate-800/70 bg-[#0b0d12]/95 backdrop-blur-xl sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto h-14 px-3 sm:px-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/favicon.png" alt="Mateha Production" className="w-8 h-8 object-contain shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[11px] text-slate-500 leading-tight truncate">Mateha Production · Kolaborasi Lapangan</p>
+              <h1 className="text-[15px] font-bold text-white leading-tight truncate">Laporan Realisasi Biaya</h1>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 text-xs">
-            <span className="hidden sm:inline text-slate-500 font-mono">User: {userEmail}</span>
+          <div className="flex items-center gap-2 text-xs shrink-0">
+            <span className="hidden md:inline text-slate-500 truncate max-w-[220px]">{userEmail}</span>
             {isGuest ? (
-              <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg text-[10px] font-mono font-bold tracking-wide select-none">
-                ● LIVE SYNC
+              <span className="inline-flex items-center gap-1.5 text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-full text-[11px] font-semibold select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live
               </span>
             ) : (
               <button
                 onClick={onLogout}
-                className="flex items-center space-x-1 py-1 px-2.5 rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-rose-300 transition cursor-pointer"
               >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Logout</span>
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Keluar</span>
               </button>
             )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8 text-left">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 py-5 sm:py-8 space-y-5 sm:space-y-6 text-left">
         
         {/* EVENT TITLE BLOCK */}
         <div className="bg-[#111317]/60 border border-slate-800 p-4 sm:p-6 rounded-2xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <span className="text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
-              Shared Project Realisasi
+            <span className="text-[11px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 rounded-md font-semibold">
+              Proyek bersama · Realisasi
             </span>
-            <h2 className="text-xl font-extrabold text-white mt-1.5">{project.name}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mt-2">{project.name}</h2>
             
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 text-xs text-slate-400 font-mono">
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 text-sm text-slate-400">
               <div className="flex items-center space-x-1.5">
                 <Calendar className="w-3.5 h-3.5 text-slate-500" />
                 <span>{project.date}</span>
@@ -349,18 +365,20 @@ export default function CollaborationView({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 hover:text-white px-4 py-3 rounded-xl font-mono text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-lg shadow-cyan-500/5"
-            >
-              <Sparkles className="w-4 h-4 text-cyan-400" />
-              <span>Modal Scan Struk AI</span>
-            </button>
+          <div className="grid grid-cols-2 sm:flex sm:items-stretch gap-2.5 sm:gap-3">
+            <div className="order-2 sm:order-1 col-span-2 sm:col-span-1">
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="w-full h-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-200 hover:text-white px-4 py-3 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+                <span>Scan Struk dengan AI</span>
+              </button>
+            </div>
 
-            <div className="bg-slate-950/80 border border-slate-900 rounded-xl px-4 py-3 min-w-[170px] flex flex-col justify-center">
-              <span className="text-[9px] uppercase font-mono tracking-wider font-bold text-slate-500">Total B Terkumpul</span>
-              <span className="text-lg font-bold font-mono text-cyan-400 mt-0.5">{formatRupiah(totalB)}</span>
+            <div className="order-1 sm:order-2 col-span-2 sm:col-span-1 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-3 sm:min-w-[190px] flex flex-col justify-center">
+              <span className="text-xs text-slate-500">Total realisasi (Point B)</span>
+              <span className="text-xl font-bold text-cyan-300 mt-0.5 tabular-nums">{formatRupiah(totalB)}</span>
             </div>
           </div>
         </div>
@@ -372,7 +390,7 @@ export default function CollaborationView({
             <div className="bg-slate-900/40 border border-slate-800 p-4 sm:p-5 rounded-2xl flex flex-col space-y-4">
               
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center space-x-2">
+                <h3 className="text-sm font-semibold text-white flex items-center space-x-2">
                   <Plus className="w-4 h-4 text-rose-400" />
                   <span>Tambah Pengeluaran Realisasi</span>
                 </h3>
@@ -380,7 +398,7 @@ export default function CollaborationView({
 
               {/* AI RECEIPT UPLOAD / DROPZONE */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-mono">
+                <div className="flex items-center justify-between text-xs">
                   <span className="text-cyan-400 font-bold flex items-center gap-1">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>Upload Struk (AI Auto-Fill)</span>
@@ -473,7 +491,7 @@ export default function CollaborationView({
               {/* MANUAL / AI FORM */}
               <form onSubmit={handleAddCost} className="space-y-4 text-xs font-sans">
                 <div>
-                  <label className="block text-slate-400 font-bold tracking-wide uppercase text-[9px] mb-1 font-mono flex items-center justify-between">
+                  <label className="block text-slate-400 font-medium text-xs mb-1.5 flex items-center justify-between">
                     <span>Deskripsi Pengeluaran / Biaya *</span>
                     {aiScanSuccess && (
                       <span className="text-cyan-400 text-[9px] lowercase font-normal italic">
@@ -487,13 +505,13 @@ export default function CollaborationView({
                     placeholder="e.g. Pembelian bensin crew, Sewa genset"
                     value={desc}
                     onChange={(e) => setDesc(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl p-2.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 font-bold tracking-wide uppercase text-[9px] mb-1 font-mono">
+                    <label className="block text-slate-400 font-medium text-xs mb-1.5">
                       Kuantitas (Qty)
                     </label>
                     <input
@@ -502,11 +520,11 @@ export default function CollaborationView({
                       min="1"
                       value={qty}
                       onChange={(e) => setQty(Number(e.target.value) || 1)}
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl p-2.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 font-mono text-center"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 font-mono text-center"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 font-bold tracking-wide uppercase text-[9px] mb-1 font-mono">
+                    <label className="block text-slate-400 font-medium text-xs mb-1.5">
                       Harga Satuan (Rp) *
                     </label>
                     <div className="relative">
@@ -517,7 +535,7 @@ export default function CollaborationView({
                         min="0"
                         value={expense}
                         onChange={(e) => setExpense(e.target.value === "" ? "" : Number(e.target.value))}
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl p-2.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 font-mono text-right"
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 font-mono text-right"
                       />
                     </div>
                   </div>
@@ -526,19 +544,19 @@ export default function CollaborationView({
                 {/* USER MANUAL PIC SELECTION FROM DAFTAR ANGGOTA TIM */}
                 <div className="p-3 bg-cyan-950/15 border border-cyan-500/25 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="block text-cyan-300 font-bold tracking-wide uppercase text-[9px] font-mono flex items-center gap-1.5">
+                    <label className="block text-cyan-200 font-medium text-xs flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Penanggung Jawab / PIC (Daftar Anggota Tim) *</span>
+                      <span>Penanggung jawab (PIC) *</span>
                     </label>
-                    <span className="text-[8px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-mono font-bold">
-                      {loadingMembers ? "MEMUAT..." : `${teamMembers.length} ANGGOTA TIM`}
+                    <span className="shrink-0 text-[10px] bg-cyan-500/15 text-cyan-300 px-1.5 py-0.5 rounded font-semibold">
+                      {loadingMembers ? "Memuat..." : `${teamMembers.length} anggota`}
                     </span>
                   </div>
 
                   <select
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl p-2.5 text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 text-xs"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 text-xs"
                   >
                     <option value="">
                       {loadingMembers
@@ -584,7 +602,7 @@ export default function CollaborationView({
                 <button
                   type="submit"
                   disabled={submitting || isScanningAI}
-                  className="w-full bg-rose-500 hover:bg-rose-450 text-white font-extrabold p-3 rounded-xl transition shadow active:scale-98 text-center cursor-pointer text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5 disabled:opacity-50"
+                  className="w-full bg-rose-500 hover:bg-rose-400 text-white font-semibold h-12 rounded-xl transition shadow active:scale-[0.98] text-center cursor-pointer text-sm flex items-center justify-center space-x-1.5 disabled:opacity-50"
                 >
                   {submitting ? (
                     <>
@@ -593,7 +611,7 @@ export default function CollaborationView({
                     </>
                   ) : (
                     <>
-                      <span>Tambah Pengeluaran Realisasi</span>
+                      <span>Tambah Pengeluaran</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -604,9 +622,9 @@ export default function CollaborationView({
             {!isGuest && (
               <button
                 onClick={onGoToDashboard}
-                className="w-full bg-slate-900/60 hover:bg-slate-850 text-slate-300 font-bold p-3 border border-slate-800 rounded-xl text-center text-xs uppercase cursor-pointer tracking-wider block transition"
+                className="w-full bg-slate-900/60 hover:bg-slate-800 text-slate-300 font-semibold h-11 border border-slate-800 rounded-xl text-center text-sm cursor-pointer block transition"
               >
-                Masuk Ke Workspace Utama Saya
+                Buka Workspace Utama
               </button>
             )}
           </div>
@@ -614,26 +632,73 @@ export default function CollaborationView({
           {/* RIGHT: LIST OF CURRENT COSTS */}
           <div className="lg:col-span-7 space-y-4">
             <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <div className="px-5 py-3.5 bg-[#0e1115]/80 border-b border-slate-800/80 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center space-x-2">
-                  <Table className="w-4 h-4 text-cyan-400" />
-                  <span>Daftar Pengeluaran Terdaftar (Akomodasi & Ops)</span>
+              <div className="px-4 sm:px-5 py-3.5 bg-[#0e1115]/80 border-b border-slate-800/80 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-2 min-w-0">
+                  <Table className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span className="truncate">Daftar Pengeluaran</span>
+                  <span className="hidden sm:inline text-slate-500 font-normal">(Akomodasi & Ops)</span>
                 </h3>
-                <span className="text-[10px] font-mono text-slate-500">
-                  {(project.realisasi.accommodation || []).length} Item Terdaftar
+                <span className="shrink-0 text-[11px] font-semibold text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-full">
+                  {(project.realisasi.accommodation || []).length} item
                 </span>
               </div>
 
-              <div className="p-4 overflow-x-auto">
+              {/* Mobile: card list */}
+              <div className="md:hidden divide-y divide-slate-800/70">
+                {(project.realisasi.accommodation || []).map((item) => (
+                  <div key={item.id} className="px-4 py-3.5 flex gap-3">
+                    <span className="mt-0.5 w-6 shrink-0 text-xs text-slate-500 tabular-nums">{item.num}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-100 break-words">{item.description}</p>
+                        <p className="shrink-0 text-sm font-bold text-cyan-300 tabular-nums">
+                          {formatRupiah((Number(item.qty) || 0) * (Number(item.expense) || 0))}
+                        </p>
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-400 tabular-nums">
+                        {item.qty} × {formatRupiah(Number(item.expense) || 0)}
+                      </p>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <div className="min-w-0">{renderPic(item.notes)}</div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {item.receiptImage && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingReceipt(item.receiptImage!)}
+                              className="h-8 px-2.5 inline-flex items-center gap-1 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 text-xs cursor-pointer"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              Struk
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-300 hover:bg-rose-500/10 cursor-pointer"
+                            aria-label="Hapus baris ini"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {(project.realisasi.accommodation || []).length === 0 && (
+                  <p className="text-center py-8 px-4 text-sm text-slate-500 italic">
+                    Belum ada data pengeluaran Point B yang dimasukkan di Realisasi.
+                  </p>
+                )}
+              </div>
+
+              <div className="hidden md:block p-4 overflow-x-auto">
                 <table className="w-full border-collapse text-left text-xs">
                   <thead>
-                    <tr className="bg-slate-950/40 border-b border-slate-800 text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                      <th className="py-2.5 px-3 w-10 text-center">Num</th>
+                    <tr className="bg-slate-950/40 border-b border-slate-800 text-[11px] font-semibold text-slate-400">
+                      <th className="py-2.5 px-3 w-10 text-center">No</th>
                       <th className="py-2.5 px-2">Deskripsi</th>
-                      <th className="py-2.5 px-2 w-12 text-center">Qty</th>
-                      <th className="py-2.5 px-2 w-24 text-right">Harga</th>
                       <th className="py-2.5 px-2 w-28 text-right">Total</th>
-                      <th className="py-2.5 px-2">PIC (PJ)</th>
+                      <th className="py-2.5 px-2 w-32">PIC</th>
                       <th className="py-2.5 px-2 w-14 text-center">Struk</th>
                       <th className="py-2.5 px-2 w-10 text-center">Aksi</th>
                     </tr>
@@ -641,38 +706,16 @@ export default function CollaborationView({
                   <tbody>
                     {(project.realisasi.accommodation || []).map((item) => (
                       <tr key={item.id} className="border-b border-slate-850/60 hover:bg-[#111317]/50 transition">
-                        <td className="py-3 px-3 font-mono text-slate-500 text-center">{item.num}</td>
-                        <td className="py-3 px-2 font-bold text-slate-200">{item.description}</td>
-                        <td className="py-3 px-2 text-center font-mono">{item.qty}</td>
-                        <td className="py-3 px-2 text-right font-mono text-slate-400">{formatRupiah(Number(item.expense) || 0)}</td>
-                        <td className="py-3 px-2 text-right font-mono font-bold text-cyan-400">{formatRupiah((Number(item.qty) || 0) * (Number(item.expense) || 0))}</td>
+                        <td className="py-3 px-3 text-slate-500 text-center tabular-nums">{item.num}</td>
+                        <td className="py-3 px-2">
+                          <p className="font-semibold text-slate-100 text-[13px] break-words">{item.description}</p>
+                          <p className="text-[11px] text-slate-500 tabular-nums">
+                            {item.qty} × {formatRupiah(Number(item.expense) || 0)}
+                          </p>
+                        </td>
+                        <td className="py-3 px-2 text-right font-bold text-cyan-300 whitespace-nowrap tabular-nums">{formatRupiah((Number(item.qty) || 0) * (Number(item.expense) || 0))}</td>
                         <td className="py-3 px-2 text-slate-300 font-medium">
-                          {(() => {
-                            const noteVal = (item.notes || "").trim();
-                            const matched = teamMembers.find(
-                              (m) =>
-                                m.username.toLowerCase() === noteVal.toLowerCase() ||
-                                (m.displayName && m.displayName.toLowerCase() === noteVal.toLowerCase())
-                            );
-                            if (matched) {
-                              return (
-                                <div className="inline-flex items-center space-x-1.5 bg-slate-900 border border-slate-800/80 px-2 py-0.5 rounded text-[11px]">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                                  <span className="text-cyan-200 font-bold">
-                                    {matched.displayName || matched.username}
-                                  </span>
-                                  {matched.displayName && matched.displayName !== matched.username && (
-                                    <span className="text-slate-500 font-mono text-[9px]">@{matched.username}</span>
-                                  )}
-                                </div>
-                              );
-                            }
-                            return (
-                              <span className="bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-[11px]">
-                                {noteVal || "-"}
-                              </span>
-                            );
-                          })()}
+                          {renderPic(item.notes)}
                         </td>
                         <td className="py-3 px-2 text-center">
                           {item.receiptImage ? (
@@ -702,7 +745,7 @@ export default function CollaborationView({
                     ))}
                     {(project.realisasi.accommodation || []).length === 0 && (
                       <tr>
-                        <td colSpan={8} className="text-center py-8 text-slate-500 italic">
+                        <td colSpan={6} className="text-center py-8 text-slate-500 italic">
                           Belum ada data pengeluaran Point B yang dimasukkan di Realisasi.
                         </td>
                       </tr>
@@ -769,8 +812,8 @@ export default function CollaborationView({
         )}
       </AnimatePresence>
 
-      <footer className="border-t border-slate-950 py-6 text-[10px] font-mono text-slate-600 text-center">
-        <span>MATEHA FINANCE SYSTEM • AI RECEIPT OCR & REALISASI SYNC</span>
+      <footer className="border-t border-slate-800/60 py-5 text-xs text-slate-600 text-center">
+        © 2026 Mateha Production · Sistem Keuangan Terpadu
       </footer>
 
     </div>
