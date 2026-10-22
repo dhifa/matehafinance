@@ -40,7 +40,7 @@ database.default.DBDriver = MySQLi
 database.default.charset = utf8mb4
 database.default.DBCollat = utf8mb4_unicode_ci
 
-GEMINI_API_KEY = isi_api_key_gemini_anda   # opsional, bisa juga diatur dari dashboard
+GEMINI_API_KEY =    # opsional; lebih mudah diisi dari dashboard admin
 ```
 
 **API key Gemini** paling mudah diatur dari aplikasi: login sebagai admin → *Dashboard & Data* →

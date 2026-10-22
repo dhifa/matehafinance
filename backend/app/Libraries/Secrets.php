@@ -2,6 +2,7 @@
 
 namespace App\Libraries;
 
+use Composer\CaBundle\CaBundle;
 use Config\Mateha;
 
 /**
@@ -51,6 +52,15 @@ class Secrets
         $stored = self::get(self::GEMINI_API_KEY);
 
         return ($stored !== null && $stored !== '') ? $stored : config(Mateha::class)->geminiApiKey;
+    }
+
+    /**
+     * CA certificates for HTTPS calls: the system bundle when PHP has one, otherwise the
+     * bundle shipped with composer/ca-bundle (fixes SSL errors on Windows PHP installs).
+     */
+    public static function caBundle(): string
+    {
+        return CaBundle::getSystemCaRootBundlePath();
     }
 
     /**

@@ -58,7 +58,11 @@ class Mateha extends BaseConfig
 
         // Accept the same variable name the Node server used
         if ($this->geminiApiKey === '') {
-            $this->geminiApiKey = (string) (getenv('GEMINI_API_KEY') ?: '');
+            $this->geminiApiKey = trim((string) (getenv('GEMINI_API_KEY') ?: ''));
+        }
+        // Ignore placeholders such as "isi_api_key_gemini_anda"; real Gemini keys are ~39 characters
+        if (! preg_match('/^[A-Za-z0-9_\-.]{30,300}$/', $this->geminiApiKey)) {
+            $this->geminiApiKey = '';
         }
     }
 }

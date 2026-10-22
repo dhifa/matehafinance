@@ -85,7 +85,7 @@ class AdminSettings extends BaseApiController
         }
 
         try {
-            $response = service('curlrequest', ['timeout' => 20, 'http_errors' => false])->get(
+            $response = service('curlrequest', ['timeout' => 20, 'http_errors' => false, 'verify' => Secrets::caBundle()])->get(
                 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1',
                 ['headers' => ['x-goog-api-key' => $key]]
             );

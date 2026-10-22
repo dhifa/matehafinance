@@ -229,7 +229,7 @@ class Gemini extends BaseApiController
             'generationConfig' => ['responseMimeType' => 'application/json', 'responseSchema' => $schema],
         ];
 
-        $client    = service('curlrequest', ['timeout' => 120, 'http_errors' => false]);
+        $client    = service('curlrequest', ['timeout' => 120, 'http_errors' => false, 'verify' => Secrets::caBundle()]);
         $lastError = 'Layanan AI sedang mengalami lonjakan trafik sementara. Silakan coba klik tombol scan kembali.';
 
         foreach (array_filter(array_map('trim', explode(',', $config->geminiModels))) as $model) {
