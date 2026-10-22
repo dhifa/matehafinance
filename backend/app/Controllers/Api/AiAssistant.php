@@ -7,6 +7,7 @@ use App\Libraries\DocumentStore;
 use App\Libraries\GeminiClient;
 use CodeIgniter\HTTP\ResponseInterface;
 use RuntimeException;
+use Throwable;
 
 /**
  * Chat assistant that turns a free-text description of an event into a project
@@ -100,6 +101,10 @@ class AiAssistant extends BaseApiController
             $result = GeminiClient::generateJson([['text' => $context]], self::INSTRUCTION, $schema, 60);
         } catch (RuntimeException $e) {
             return $this->fail(502, 'ai-error', $e->getMessage());
+        } catch (Throwable $e) {
+            log_message('error', '[AI event-draft] {message} in {file}:{line}', ['message' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+
+            return $this->fail(500, 'internal', 'Asisten AI error: ' . $e->getMessage());
         }
 
         $result = is_array($result) ? $result : [];
@@ -124,7 +129,11 @@ class AiAssistant extends BaseApiController
 
         foreach ($projects as $project) {
             foreach (self::SECTIONS as $section) {
-                foreach (($project['data']['rab'][$section] ?? []) as $row) {
+                $rows = $project['data']['rab'][$section] ?? [];
+                foreach (is_array($rows) ? $rows : [] as $row) {
+                    if (! is_array($row)) {
+                        continue;
+                    }
                     $desc = trim((string) ($row['description'] ?? ''));
                     $key  = mb_strtolower($desc);
                     if ($desc === '' || isset($catalog[$section][$key]) || count($catalog[$section]) >= 60) {

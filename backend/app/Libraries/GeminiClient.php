@@ -20,6 +20,9 @@ class GeminiClient
      */
     public static function generateJson(array $parts, string $instruction, array $schema, int $timeout = 120): mixed
     {
+        // Trying several models can exceed php.ini's default 30s request limit
+        @set_time_limit(max(180, $timeout * 3));
+
         $config = config(Mateha::class);
         try {
             $apiKey = Secrets::geminiApiKey();

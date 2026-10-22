@@ -76,7 +76,8 @@ export async function apiFetch<T = any>(path: string, init: { method?: string; b
       setToken(null);
       unauthorizedHandler?.();
     }
-    throw new ApiError(res.status, code, payload?.error || `Permintaan gagal (${res.status})`);
+    const message = payload?.error || payload?.message || (text && !payload ? text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) : "");
+    throw new ApiError(res.status, code, message || `Permintaan gagal (${res.status})`);
   }
 
   return payload as T;
