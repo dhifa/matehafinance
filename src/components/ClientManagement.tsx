@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Client } from "../types";
-import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from "firebase/firestore";
-import { db, sanitizeForFirestore } from "../utils/firebase";
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from "../lib/firestore";
+import { db, sanitizeForFirestore } from "../utils/backend";
 import { resolveClientDetails } from "../utils/clientHelper";
 import { notify } from "../utils/notification";
 import { 

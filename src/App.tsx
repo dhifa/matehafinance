@@ -77,9 +77,9 @@ import logo from "/favicon.png";
 import { Sidebar, MobileTopBar, BottomNav, MobileMenuSheet } from "./components/layout/AppNavigation";
 
 // Firebase operations
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, doc, query, where, onSnapshot, setDoc, deleteDoc, getDoc } from "firebase/firestore";
-import { auth, db, handleFirestoreError, OperationType, sanitizeForFirestore } from "./utils/firebase";
+import { onAuthStateChanged, signOut } from "./lib/auth";
+import { collection, doc, query, where, onSnapshot, setDoc, deleteDoc, getDoc } from "./lib/firestore";
+import { auth, db, handleFirestoreError, OperationType, sanitizeForFirestore } from "./utils/backend";
 
 export type { TabType };
 
@@ -156,7 +156,6 @@ export default function App() {
     }
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [isQuotaBannerDismissed, setIsQuotaBannerDismissed] = useState<boolean>(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState<boolean>(false);
 
   const handleToggleSidebar = () => {
@@ -1298,31 +1297,6 @@ _Sistem Keuangan Otomatis Mateha Production_`;
         <MobileTopBar title={currentTabItem.label} logo={logo} user={navUser} onOpenMenu={() => setIsMobileMenuOpen(true)} />
       )}
 
-      {/* FIRESTORE QUOTA EXCEEDED NOTICE BANNER */}
-      {isQuotaExceeded && !isQuotaBannerDismissed && (
-        <div className="bg-amber-950/60 border-b border-amber-600/30 px-4 py-2 text-amber-200 text-xs flex items-center gap-2.5">
-          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-          <p className="flex-1 min-w-0 leading-snug">
-            <strong className="font-semibold">Kuota baca Firestore harian habis.</strong>{" "}
-            <span className="hidden sm:inline text-amber-200/80">Data dari cache sementara ditampilkan dan akan pulih otomatis besok.</span>{" "}
-            <a
-              href="https://console.firebase.google.com/project/gen-lang-client-0656486078/firestore/databases/ai-studio-d4b4d284-2843-494d-a06e-e71a92b31fd4/data?openUpgradeDialog=true"
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-amber-300 underline underline-offset-2 hover:text-amber-200 whitespace-nowrap"
-            >
-              Upgrade
-            </a>
-          </p>
-          <button
-            onClick={() => setIsQuotaBannerDismissed(true)}
-            className="p-1 rounded-md text-amber-300/80 hover:text-amber-100 hover:bg-amber-500/10 cursor-pointer shrink-0"
-            aria-label="Tutup pemberitahuan"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* GLOBAL POPUP MODAL NOTIFICATION */}
       <NotificationModal 

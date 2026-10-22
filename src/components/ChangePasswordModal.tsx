@@ -11,13 +11,13 @@ import {
   X,
   ShieldCheck
 } from "lucide-react";
-import { auth, db } from "../utils/firebase";
+import { auth, db } from "../utils/backend";
 import { 
   updatePassword, 
   reauthenticateWithCredential, 
   EmailAuthProvider 
-} from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
+} from "../lib/auth";
+import { doc, updateDoc } from "../lib/firestore";
 import { UserProfile } from "../types";
 
 interface ChangePasswordModalProps {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../utils/firebase";
-import { doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { db } from "../utils/backend";
+import { doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove } from "../lib/firestore";
 import { MatehaAccount, MatehaTransaction, formatRupiah, EventProject, SyncedProject } from "../types";
 import { ArrowLeftRight, PiggyBank, Wallet, PlusCircle, MinusCircle, History, Trash2, RefreshCw, FileDown } from "lucide-react";
 import { calculateProjectBudget } from "../utils/math";

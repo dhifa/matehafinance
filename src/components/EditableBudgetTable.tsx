@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { ProjectBudget, BudgetItem, SharingRatio, StaffRolePreset, formatRupiah, UserProfile } from "../types";
 import { calculateProjectBudget } from "../utils/math";
 import { Trash2, Plus, Copy, RotateCcw, RotateCw, Layers, Share2, Check, Lock, Unlock, Sparkles, Camera, ImageIcon, X, Eye } from "lucide-react";
-import { db } from "../utils/firebase";
-import { collection, onSnapshot, doc } from "firebase/firestore";
+import { db } from "../utils/backend";
+import { collection, onSnapshot, doc } from "../lib/firestore";
 import ReceiptScannerModal from "./ReceiptScannerModal";
 
 interface EditableBudgetTableProps {

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { auth, db } from "../utils/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { signInWithEmailAndPassword, signOut } from "../lib/auth";
+import { auth, db } from "../utils/backend";
+import { doc, getDoc } from "../lib/firestore";
 import { motion } from "motion/react";
 import { 
   KeyRound, 

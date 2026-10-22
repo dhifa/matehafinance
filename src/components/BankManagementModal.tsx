@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Bank } from "../types";
-import { doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
-import { db } from "../utils/firebase";
+import { doc, setDoc, deleteDoc, updateDoc } from "../lib/firestore";
+import { db } from "../utils/backend";
 import { notify } from "../utils/notification";
 import { 
   Building2, 

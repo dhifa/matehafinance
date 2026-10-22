@@ -8,8 +8,8 @@ import {
   orderBy, 
   deleteDoc, 
   updateDoc 
-} from "firebase/firestore";
-import { db, sanitizeForFirestore } from "../utils/firebase";
+} from "../lib/firestore";
+import { db, sanitizeForFirestore } from "../utils/backend";
 import { Kwitansi, Invoice, formatRupiah, Bank, Client } from "../types";
 import KwitansiPreview from "./KwitansiPreview";
 import BankManagementModal from "./BankManagementModal";

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { collection, onSnapshot, doc, setDoc, getDoc, query, updateDoc } from "firebase/firestore";
-import { db } from "../utils/firebase";
+import { collection, onSnapshot, doc, setDoc, getDoc, query, updateDoc } from "../lib/firestore";
+import { db } from "../utils/backend";
 import { EventProject, UserProfile, formatRupiah, PublishedPayslip, KasbonRequest } from "../types";
 import { calculateProjectBudget } from "../utils/math";
 import html2canvas from 'html2canvas';

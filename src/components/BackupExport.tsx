@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import { db } from "../utils/firebase";
+import { collection, getDocs, doc, getDoc } from "../lib/firestore";
+import { db } from "../utils/backend";
 import { Download, DatabaseBackup, Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -49,7 +49,7 @@ export default function BackupExport() {
       }
 
       // Also export system settings (custom roles, staff presets, etc.)
-      const settingsDocs = ["staff_presets", "custom_roles"];
+      const settingsDocs = ["staff_presets", "custom_roles", "mateha_finance"];
       const exportedSettings: Record<string, any> = {};
       for (const sDoc of settingsDocs) {
         try {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "firebase/firestore";
-import { db, sanitizeForFirestore } from "../utils/firebase";
+import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "../lib/firestore";
+import { db, sanitizeForFirestore } from "../utils/backend";
 import { Invoice, InvoiceItem, formatRupiah, Bank, Client } from "../types";
 import { Plus, Trash2, Save, FileText, Eye, Download, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users, UserCheck, Coins, Percent } from "lucide-react";
 import InvoicePreview from "./InvoicePreview";

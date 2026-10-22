@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { EventProject, BudgetItem, formatRupiah, UserProfile } from "../types";
-import { setDoc, doc, collection, onSnapshot } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType, sanitizeForFirestore } from "../utils/firebase";
+import { setDoc, doc, collection, onSnapshot } from "../lib/firestore";
+import { db, handleFirestoreError, OperationType, sanitizeForFirestore } from "../utils/backend";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Plus, 

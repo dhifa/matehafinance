@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "firebase/firestore";
-import { db, sanitizeForFirestore } from "../utils/firebase";
+import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "../lib/firestore";
+import { db, sanitizeForFirestore } from "../utils/backend";
 import { Quotation, QuotationItem, Bank, Client, formatRupiah } from "../types";
 import { Plus, Trash2, Save, FileText, Eye, Download, CheckCircle, Search, X, Loader2, Edit3, Check, ListPlus, ArrowUp, ArrowDown, Building2, Users, UserCheck } from "lucide-react";
 import QuotationPreview from "./QuotationPreview";

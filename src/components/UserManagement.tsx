@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, addDoc } from "firebase/firestore";
-import { db, sanitizeForFirestore, registerTeamMemberByAdmin, syncUserAuthPassword } from "../utils/firebase";
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, addDoc } from "../lib/firestore";
+import { db, sanitizeForFirestore, registerTeamMemberByAdmin, syncUserAuthPassword } from "../utils/backend";
 import { UserProfile, CustomRole, StaffRolePreset, formatRupiah, TabType, KasbonPlafondType } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -920,7 +920,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                             {item.password}
                           </span>
                         ) : (
-                          <span className="text-slate-600 italic">Tersandi (Auth)</span>
+                          <span className="text-slate-500 italic">•••••• (terenkripsi)</span>
                         )}
                       </td>
 
@@ -1576,14 +1576,14 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
                     </span>
                     <input
                       type="text"
-                      placeholder="Masukkan password baru / catatan password..."
+                      placeholder="Kosongkan jika tidak diubah, atau isi password baru"
                       value={editPasswordInput}
                       onChange={(e) => setEditPasswordInput(e.target.value)}
                       className="w-full bg-[#080a0f] border border-slate-800 focus:border-cyan-500 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-200 font-mono focus:outline-none"
                     />
                   </div>
                   <span className="text-[9px] text-slate-500 block mt-1">
-                    Catatan: Password tersimpan di profil anggota tim untuk memudahkan administrasi.
+                    Password disimpan terenkripsi dan tidak bisa dilihat. Isi kolom ini untuk me-reset password anggota.
                   </span>
                 </div>
 

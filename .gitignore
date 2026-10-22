@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Production build copied into the CI4 app (npm run build:backend)
+backend/public/app.html
+backend/public/assets/
