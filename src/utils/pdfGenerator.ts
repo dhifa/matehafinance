@@ -304,8 +304,8 @@ export const generateQuotationPdfBlob = async (quotation: Quotation): Promise<Bl
                   <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 9px;">
                     <p style="font-weight: 800; color: #0f172a; margin: 0 0 3px 0; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">Syarat & Ketentuan Penawaran:</p>
                     <div style="color: #475569; line-height: 1.35;">
-                      <p style="margin: 0 0 2px 0;">1. Harga mencakup transportasi alat, instalasi, dan operator teknisi.</p>
-                      <p style="margin: 0 0 2px 0;">2. DP minimal 50% saat konfirmasi, pelunasan pada saat hari H acara.</p>
+                      <p style="margin: 0 0 2px 0;">1. Harga sudah termasuk biaya instalasi dan operator teknisi selama acara.</p>
+                      <p style="margin: 0 0 2px 0;">2. Konfirmasi pemesanan dilakukan dengan DP minimal 50%, pelunasan saat acara.</p>
                       ${quotation.termsAndConditions ? `<p style="margin: 2px 0 0 0; color: #1e293b; font-weight: 600; border-top: 1px dashed #cbd5e1; padding-top: 2px;">Catatan: ${quotation.termsAndConditions}</p>` : ''}
                     </div>
                   </div>
@@ -330,11 +330,9 @@ export const generateQuotationPdfBlob = async (quotation: Quotation): Promise<Bl
               Demikian surat penawaran harga ini kami sampaikan. Besar harapan kami untuk dapat bekerjasama dalam menyukseskan acara Anda. Atas perhatian dan kepercayaannya, kami ucapkan terima kasih.
             </div>
           `}
-        </div>
 
-        <!-- BOTTOM SECTION (PINNED TO BOTTOM) -->
-        <div style="position: relative; z-index: 10; padding-top: 6px;">
-          ${page.isLastPage ? `
+          <!-- TANDA TANGAN (langsung di bawah konten, sama seperti pratinjau) -->
+          ${page.isLastPage ? `<div style="padding-top: 8px;">
             ${quotation.showClientApproval ? `
               <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
                 <tr>
@@ -354,12 +352,12 @@ export const generateQuotationPdfBlob = async (quotation: Quotation): Promise<Bl
                   </td>
                 </tr>
                 <tr>
-                  <td style="width: 50%; height: 72px; vertical-align: middle; text-align: center; padding-right: 20px;">
-                    <div style="height: 72px;"></div>
+                  <td style="width: 50%; height: 96px; vertical-align: middle; text-align: center; padding-right: 20px;">
+                    <div style="height: 96px;"></div>
                   </td>
-                  <td style="width: 50%; height: 72px; vertical-align: middle; text-align: center; padding-left: 20px;">
-                    <div style="height: 72px; display: flex; align-items: center; justify-content: center;">
-                      <img src="${logoTtd}" alt="TTD" style="height: 70px; max-height: 70px; width: auto; max-width: 175px; object-fit: contain; margin: 0 auto; display: block;" />
+                  <td style="width: 50%; height: 96px; vertical-align: middle; text-align: center; padding-left: 20px;">
+                    <div style="height: 96px; display: flex; align-items: center; justify-content: center;">
+                      <img src="${logoTtd}" alt="TTD" style="height: 96px; max-height: 96px; width: auto; max-width: 220px; object-fit: contain; margin: 0 auto; display: block;" />
                     </div>
                   </td>
                 </tr>
@@ -394,8 +392,8 @@ export const generateQuotationPdfBlob = async (quotation: Quotation): Promise<Bl
                   <td style="width: 40%; vertical-align: bottom; text-align: center;">
                     <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
                     <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
-                    <div style="height: 72px; display: flex; align-items: center; justify-content: center;">
-                      <img src="${logoTtd}" alt="TTD" style="height: 70px; max-height: 70px; width: auto; max-width: 175px; object-fit: contain; margin: 0 auto; display: block;" />
+                    <div style="height: 96px; display: flex; align-items: center; justify-content: center;">
+                      <img src="${logoTtd}" alt="TTD" style="height: 96px; max-height: 96px; width: auto; max-width: 220px; object-fit: contain; margin: 0 auto; display: block;" />
                     </div>
                     <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
                     <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
@@ -403,8 +401,11 @@ export const generateQuotationPdfBlob = async (quotation: Quotation): Promise<Bl
                 </tr>
               </table>
             `}
-          ` : ''}
+          </div>` : ''}
+        </div>
 
+        <!-- BOTTOM SECTION (PINNED TO BOTTOM) -->
+        <div style="position: relative; z-index: 10; padding-top: 6px;">
           <!-- FOOTER DOKUMEN -->
           <div style="border-top: 1px solid #e2e8f0; padding-top: 4px; display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: monospace;">
             <span>Dokumen Resmi Mateha Production • Lembar ${page.pageNumber} dari ${page.totalPages}</span>
@@ -612,21 +613,18 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
                   </div>
                 </td>
                 <td style="width: 48%; vertical-align: top;">
-                  ${invoice.termsAndConditions ? `
-                    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 9px;">
-                      <p style="font-weight: 800; color: #92400e; margin: 0 0 3px 0; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; border-bottom: 1px solid #fde68a; padding-bottom: 2px;">Syarat & Ketentuan Pembayaran:</p>
-                      <p style="margin: 0; color: #78350f; font-size: 9.5px; line-height: 1.35;">${invoice.termsAndConditions}</p>
-                    </div>
-                  ` : ''}
+                  <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 9px;">
+                    <p style="font-weight: 800; color: #92400e; margin: 0 0 3px 0; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; border-bottom: 1px solid #fde68a; padding-bottom: 2px;">Syarat & Ketentuan Pembayaran:</p>
+                    <p style="margin: 0; color: #78350f; font-size: 9.5px; line-height: 1.35;">1. Bukti transfer mohon dikirimkan ke admin untuk verifikasi pembayaran.</p>
+                    ${invoice.termsAndConditions ? `<p style="margin: 2px 0 0 0; color: #78350f; font-size: 9.5px; line-height: 1.35; font-weight: 600; border-top: 1px solid #fde68a; padding-top: 2px;">${invoice.termsAndConditions}</p>` : ''}
+                  </div>
                 </td>
               </tr>
             </table>
           `}
-        </div>
 
-        <!-- BOTTOM SECTION (PINNED TO BOTTOM) -->
-        <div style="position: relative; z-index: 10; padding-top: 6px;">
-          ${page.isLastPage ? `
+          <!-- TANDA TANGAN (langsung di bawah konten, sama seperti pratinjau) -->
+          ${page.isLastPage ? `<div style="padding-top: 8px;">
             ${invoice.showClientApproval ? `
               <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px;">
                 <tr>
@@ -646,12 +644,12 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
                   </td>
                 </tr>
                 <tr>
-                  <td style="width: 50%; height: 72px; vertical-align: middle; text-align: center; padding-right: 20px;">
-                    <div style="height: 72px;"></div>
+                  <td style="width: 50%; height: 96px; vertical-align: middle; text-align: center; padding-right: 20px;">
+                    <div style="height: 96px;"></div>
                   </td>
-                  <td style="width: 50%; height: 72px; vertical-align: middle; text-align: center; padding-left: 20px;">
-                    <div style="height: 72px; display: flex; align-items: center; justify-content: center;">
-                      <img src="${logoTtd}" alt="TTD" style="height: 70px; max-height: 70px; width: auto; max-width: 175px; object-fit: contain; margin: 0 auto; display: block;" />
+                  <td style="width: 50%; height: 96px; vertical-align: middle; text-align: center; padding-left: 20px;">
+                    <div style="height: 96px; display: flex; align-items: center; justify-content: center;">
+                      <img src="${logoTtd}" alt="TTD" style="height: 96px; max-height: 96px; width: auto; max-width: 220px; object-fit: contain; margin: 0 auto; display: block;" />
                     </div>
                   </td>
                 </tr>
@@ -686,8 +684,8 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
                   <td style="width: 40%; vertical-align: bottom; text-align: center;">
                     <p style="margin: 0 0 2px 0; color: #475569; font-size: 10.5px;">Bandung, ${formattedDate}</p>
                     <p style="margin: 0 0 3px 0; font-weight: 700; color: #0f172a; font-size: 11px;">Hormat Kami,</p>
-                    <div style="height: 72px; display: flex; align-items: center; justify-content: center;">
-                      <img src="${logoTtd}" alt="TTD" style="height: 70px; max-height: 70px; width: auto; max-width: 175px; object-fit: contain; margin: 0 auto; display: block;" />
+                    <div style="height: 96px; display: flex; align-items: center; justify-content: center;">
+                      <img src="${logoTtd}" alt="TTD" style="height: 96px; max-height: 96px; width: auto; max-width: 220px; object-fit: contain; margin: 0 auto; display: block;" />
                     </div>
                     <p style="font-weight: 900; color: #0f172a; margin: 0; font-size: 11.5px; text-decoration: underline;">Dhifa Aksa Hermawan</p>
                     <p style="color: #64748b; margin: 1px 0 0 0; font-size: 9.5px; font-weight: 600;">CEO Mateha Production</p>
@@ -695,8 +693,11 @@ export const generateInvoicePdfBlob = async (invoice: Invoice): Promise<Blob> =>
                 </tr>
               </table>
             `}
-          ` : ''}
+          </div>` : ''}
+        </div>
 
+        <!-- BOTTOM SECTION (PINNED TO BOTTOM) -->
+        <div style="position: relative; z-index: 10; padding-top: 6px;">
           <!-- FOOTER DOKUMEN -->
           <div style="border-top: 1px solid #e2e8f0; padding-top: 4px; display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: monospace;">
             <span>Dokumen Resmi Mateha Production • Lembar ${page.pageNumber} dari ${page.totalPages}</span>
