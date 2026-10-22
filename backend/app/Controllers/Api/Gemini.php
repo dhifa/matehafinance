@@ -3,9 +3,8 @@
 namespace App\Controllers\Api;
 
 use App\Libraries\Auth;
-use App\Libraries\Secrets;
+use App\Libraries\GeminiClient;
 use CodeIgniter\HTTP\ResponseInterface;
-use Config\Mateha;
 use RuntimeException;
 
 /**
@@ -205,59 +204,6 @@ class Gemini extends BaseApiController
      */
     private function generate(string $imageBase64, string $mimeType, string $instruction, string $prompt, array $schema): mixed
     {
-        $config = config(Mateha::class);
-        try {
-            $apiKey = Secrets::geminiApiKey();
-        } catch (\Throwable) {
-            // app_secrets not migrated yet: fall back to .env
-            $apiKey = $config->geminiApiKey;
-        }
-        if ($apiKey === '') {
-            throw new RuntimeException('API key Gemini belum diatur. Admin dapat mengisinya di Dashboard > Pengaturan AI.');
-        }
-
-        $mimeType = preg_match('#^image/[a-z0-9.+-]+$#i', $mimeType) ? $mimeType : 'image/jpeg';
-        $payload  = [
-            'systemInstruction' => ['parts' => [['text' => $instruction]]],
-            'contents'          => [[
-                'role'  => 'user',
-                'parts' => [
-                    ['inlineData' => ['mimeType' => $mimeType, 'data' => preg_replace('#^data:[^;]+;base64,#', '', $imageBase64)]],
-                    ['text' => $prompt],
-                ],
-            ]],
-            'generationConfig' => ['responseMimeType' => 'application/json', 'responseSchema' => $schema],
-        ];
-
-        $client    = service('curlrequest', ['timeout' => 120, 'http_errors' => false, 'verify' => Secrets::caBundle()]);
-        $lastError = 'Layanan AI sedang mengalami lonjakan trafik sementara. Silakan coba klik tombol scan kembali.';
-
-        foreach (array_filter(array_map('trim', explode(',', $config->geminiModels))) as $model) {
-            try {
-                $response = $client->post(
-                    'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent',
-                    ['headers' => ['Content-Type' => 'application/json', 'x-goog-api-key' => $apiKey], 'body' => json_encode($payload)]
-                );
-            } catch (\Throwable $e) {
-                // Connection/SSL problems affect every model equally, so stop here
-                throw new RuntimeException(Secrets::explainConnectionError($e));
-            }
-            $json = json_decode($response->getBody(), true);
-
-            if ($response->getStatusCode() === 200) {
-                $text   = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
-                $result = json_decode($text, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    return $result;
-                }
-                $lastError = 'Gagal memproses parsing data dari reply kecerdasan buatan';
-            } else {
-                $lastError = $json['error']['message'] ?? $lastError;
-                log_message('warning', '[Gemini Fallback] {model} failed: {error}', ['model' => $model, 'error' => $lastError]);
-            }
-            usleep(400000);
-        }
-
-        throw new RuntimeException($lastError);
+        return GeminiClient::generateJson([GeminiClient::imagePart($imageBase64, $mimeType), ['text' => $prompt]], $instruction, $schema);
     }
 }

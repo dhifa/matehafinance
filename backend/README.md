@@ -47,6 +47,13 @@ GEMINI_API_KEY =    # opsional; lebih mudah diisi dari dashboard admin
 kartu **Pengaturan AI (Gemini)** → tempel key → *Tes Koneksi* → *Simpan Key*. Key dari dashboard dipakai lebih
 dulu; jika dikosongkan, sistem memakai `GEMINI_API_KEY` di `.env`.
 
+## Asisten AI (buat event dari chat)
+
+Di *Dashboard & Data* (admin) ada kartu **Asisten AI · Buat Event dari Chat**. Ketik cerita event, misalnya
+"tgl 23 oktober ada event Bagimu Negeri di Mercure Lengkong, 3 kamera streaming dan 1 VJ, matador 2".
+AI menyusun draf (nama, tanggal, lokasi, item RAB) dengan harga dari riwayat event sebelumnya; koreksi lewat chat,
+lalu klik **Buat Event**. Event tidak dibuat sebelum dikonfirmasi. Endpoint: `POST /api/ai/event-draft`.
+
 ## Pindah data dari Firestore
 
 1. **Sebelum** beralih, buka aplikasi versi lama (Firebase) sebagai admin → *Dashboard & Data* →

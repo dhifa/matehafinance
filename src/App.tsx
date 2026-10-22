@@ -10,7 +10,8 @@ import {
     StaffRolePreset,
     PublishedPayslip,
     CustomRole,
-    TabType
+    TabType,
+    BudgetItem
   } from "./types";
 import { calculateProjectBudget } from "./utils/math";
 import DashboardStats from "./components/DashboardStats";
@@ -25,7 +26,7 @@ import KwitansiView from "./components/KwitansiView";
 import ClientManagement from "./components/ClientManagement";
 import MultiDatePicker from "./components/MultiDatePicker";
 import PublicPayslipView from "./components/PublicPayslipView";
-import { parseIndonesianDateText, getProjectEarliestTimestamp } from "./utils/date";
+import { parseIndonesianDateText, getProjectEarliestTimestamp, formatMultiDates } from "./utils/date";
 import PayslipView from "./components/PayslipView";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -70,6 +71,7 @@ import {
 import UserManagement from "./components/UserManagement";
 import BackupExport from "./components/BackupExport";
 import AiSettingsCard from "./components/AiSettingsCard";
+import AiEventAssistant, { AiEventDraft } from "./components/AiEventAssistant";
 import StaffPayslipView from "./components/StaffPayslipView";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import NotificationModal, { PopupNotificationState } from "./components/NotificationModal";
@@ -564,6 +566,21 @@ export default function App() {
     return () => unsubscribe();
   }, [user, sharedProjectId]);
 
+  // Landing page right after login: admins start on the Dashboard, other members on Staff Payslip
+  const landingAppliedFor = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!user) {
+      landingAppliedFor.current = null;
+      return;
+    }
+    if (!userProfile || availableTabs.length === 0 || sharedProjectId || landingAppliedFor.current === user.uid) return;
+    landingAppliedFor.current = user.uid;
+
+    const isAdminRole = (userProfile.role || "").toLowerCase() === "admin";
+    const preferred: TabType = isAdminRole ? "dashboard" : "staff-payslips";
+    setActiveTab(availableTabs.some((t) => t.id === preferred) ? preferred : availableTabs[0].id);
+  }, [user, userProfile, availableTabs, sharedProjectId]);
+
   // Keep user inside valid tabs according to role permissions
   useEffect(() => {
     if (availableTabs.length > 0 && !availableTabs.some((t) => t.id === activeTab)) {
@@ -675,6 +692,50 @@ export default function App() {
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, `projects/${projId}`);
     }
+  };
+
+  // Creates a project from a draft prepared by the AI assistant (same shape as handleCreateProject)
+  const handleCreateProjectFromAi = async (draft: AiEventDraft) => {
+    if (!user) return;
+    const projId = `project-${Date.now()}`;
+    const toItems = (rows: AiEventDraft["income"], prefix: string): BudgetItem[] =>
+      rows.map((r, i) => ({
+        id: `${prefix}-${Date.now()}-${i}`,
+        num: i + 1,
+        description: r.description,
+        qty: r.qty,
+        expense: r.expense,
+        notes: r.notes || "",
+      }));
+
+    const newProj: EventProject = {
+      id: projId,
+      name: draft.name.trim(),
+      date: draft.dates.length ? formatMultiDates(draft.dates) : "Belum ditentukan",
+      dates: draft.dates,
+      location: draft.location.trim() || "Belum ditentukan",
+      createdAt: new Date().toISOString(),
+      rab: {
+        income: toItems(draft.income, "ai-in"),
+        accommodation: toItems(draft.accommodation, "ai-ac"),
+        sharingRatio: { ...DEFAULT_SHARING_RATIO },
+        picBonusRatio: DEFAULT_PIC_BONUS_RATIO,
+        feeDistribution: toItems(draft.feeDistribution, "ai-fee")
+      },
+      realisasi: {
+        income: [],
+        accommodation: [],
+        sharingRatio: { ...DEFAULT_SHARING_RATIO },
+        picBonusRatio: DEFAULT_PIC_BONUS_RATIO,
+        feeDistribution: []
+      }
+    };
+
+    await setDoc(doc(db, "projects", projId), sanitizeForFirestore({ ...newProj, ownerId: user.uid }));
+    setActiveProjectId(projId);
+    setActiveTab("sheets");
+    window.scrollTo({ top: 0 });
+    triggerNotification(`Event "${newProj.name}" berhasil dibuat oleh Asisten AI!`);
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1640,6 +1701,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
         {/* ==================== TAB VIEW 2: DASHBOARD & COMPARISON DATA ==================== */}
         {activeTab === "dashboard" && (
           <div className="space-y-6 text-left">
+            {!!userProfile && <AiEventAssistant onCreate={handleCreateProjectFromAi} />}
             {!!userProfile && <DashboardStats projects={projects} />}
             {!!userProfile && <FinancialChart projects={projects} />}
             {!!userProfile && userProfile.role === "admin" && <AiSettingsCard />}
