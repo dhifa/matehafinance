@@ -12,6 +12,10 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => ['cors'
     $routes->post('auth/change-password', 'AuthController::changePassword');
 
     $routes->post('admin/users', 'AdminUsers::create');
+    $routes->get('admin/settings/ai', 'AdminSettings::ai');
+    $routes->put('admin/settings/ai', 'AdminSettings::saveAi');
+    $routes->delete('admin/settings/ai', 'AdminSettings::deleteAi');
+    $routes->post('admin/settings/ai/test', 'AdminSettings::testAi');
 
     $routes->post('gemini/parse-rab', 'Gemini::parseRab');
     $routes->post('gemini/parse-receipt', 'Gemini::parseReceipt');

@@ -40,8 +40,12 @@ database.default.DBDriver = MySQLi
 database.default.charset = utf8mb4
 database.default.DBCollat = utf8mb4_unicode_ci
 
-GEMINI_API_KEY = isi_api_key_gemini_anda
+GEMINI_API_KEY = isi_api_key_gemini_anda   # opsional, bisa juga diatur dari dashboard
 ```
+
+**API key Gemini** paling mudah diatur dari aplikasi: login sebagai admin → *Dashboard & Data* →
+kartu **Pengaturan AI (Gemini)** → tempel key → *Tes Koneksi* → *Simpan Key*. Key dari dashboard dipakai lebih
+dulu; jika dikosongkan, sistem memakai `GEMINI_API_KEY` di `.env`.
 
 ## Pindah data dari Firestore
 
@@ -73,7 +77,7 @@ GEMINI_API_KEY = isi_api_key_gemini_anda
    - Jika document root tidak bisa diubah, upload isi `backend/public` ke `public_html`, folder lainnya ke luar
      `public_html`, lalu sesuaikan path di `public_html/index.php` (`$pathsConfig`).
 4. Buat `.env` di server (set `CI_ENVIRONMENT = production`, `app.baseURL = 'https://domain-anda/'`, kredensial
-   database, `GEMINI_API_KEY`), lalu jalankan `php spark migrate`.
+   database), lalu jalankan `php spark migrate`. API key Gemini bisa diisi setelahnya dari dashboard admin.
 5. Pastikan folder `writable/` bisa ditulis web server.
 
 API dan tampilan berjalan di domain yang sama, jadi tidak perlu pengaturan CORS. Jika tampilan di-host di domain
@@ -95,6 +99,8 @@ lain, isi `CORS_ALLOWED_ORIGINS` di `.env` dan set `VITE_API_BASE_URL` saat buil
 - Login memakai token acak (hanya *hash*-nya yang disimpan di `auth_tokens`), berlaku 30 hari; percobaan login
   dibatasi per IP.
 - Password hanya disimpan sebagai *hash* (`password_hash`) dan tidak pernah dikirim ke browser.
+- API key Gemini disimpan di tabel `app_secrets` yang tidak bisa diakses lewat API data; hanya admin yang bisa
+  mengubahnya dan browser hanya menerima versi tersamar (mis. `AIza…x9Qk`).
 - Aturan akses ada di `app/Libraries/Policy.php` (porting dari `firestore.rules`) dengan perbaikan:
   staf tidak bisa mengubah peran sendiri, profil anggota lain hanya menampilkan nama/peran, dan tamu di link
   berbagi hanya bisa menambah pengeluaran Point B.

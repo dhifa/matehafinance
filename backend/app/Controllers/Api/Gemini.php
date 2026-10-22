@@ -3,6 +3,7 @@
 namespace App\Controllers\Api;
 
 use App\Libraries\Auth;
+use App\Libraries\Secrets;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Mateha;
 use RuntimeException;
@@ -205,8 +206,9 @@ class Gemini extends BaseApiController
     private function generate(string $imageBase64, string $mimeType, string $instruction, string $prompt, array $schema): mixed
     {
         $config = config(Mateha::class);
-        if ($config->geminiApiKey === '') {
-            throw new RuntimeException('GEMINI_API_KEY belum dikonfigurasi di file .env backend.');
+        $apiKey = Secrets::geminiApiKey();
+        if ($apiKey === '') {
+            throw new RuntimeException('API key Gemini belum diatur. Admin dapat mengisinya di Dashboard > Pengaturan AI.');
         }
 
         $mimeType = preg_match('#^image/[a-z0-9.+-]+$#i', $mimeType) ? $mimeType : 'image/jpeg';
@@ -228,7 +230,7 @@ class Gemini extends BaseApiController
         foreach (array_filter(array_map('trim', explode(',', $config->geminiModels))) as $model) {
             $response = $client->post(
                 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent',
-                ['headers' => ['Content-Type' => 'application/json', 'x-goog-api-key' => $config->geminiApiKey], 'body' => json_encode($payload)]
+                ['headers' => ['Content-Type' => 'application/json', 'x-goog-api-key' => $apiKey], 'body' => json_encode($payload)]
             );
             $json = json_decode($response->getBody(), true);
 

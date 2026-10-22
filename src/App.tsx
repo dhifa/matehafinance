@@ -69,6 +69,7 @@ import {
 } from "lucide-react";
 import UserManagement from "./components/UserManagement";
 import BackupExport from "./components/BackupExport";
+import AiSettingsCard from "./components/AiSettingsCard";
 import StaffPayslipView from "./components/StaffPayslipView";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import NotificationModal, { PopupNotificationState } from "./components/NotificationModal";
@@ -1641,6 +1642,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
           <div className="space-y-6 text-left">
             {!!userProfile && <DashboardStats projects={projects} />}
             {!!userProfile && <FinancialChart projects={projects} />}
+            {!!userProfile && userProfile.role === "admin" && <AiSettingsCard />}
             {!!userProfile && userProfile.role === "admin" && <BackupExport />}
             
             {/* OVERVIEW TABLE FOR ALL REGISTERED PROJECTS */}
