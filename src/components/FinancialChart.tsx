@@ -70,7 +70,7 @@ export default function FinancialChart({ projects }: FinancialChartProps) {
   }, [projects]);
 
   return (
-    <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 shadow-xl mb-6">
+    <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl mb-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h3 className="text-base font-bold text-slate-100 flex items-center space-x-2">

@@ -772,7 +772,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
   return (
     <div className="space-y-6 pb-16">
       {/* TOP HEADER & CONTROLS */}
-      <div className="bg-[#0b0f17] border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+      <div className="bg-[#0b0f17] border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-3.5">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner">
@@ -843,18 +843,19 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
         </div>
 
         {/* NAVIGATION SEGMENTED TABS */}
-        <div className="flex items-center space-x-2 border-t border-slate-850/80 pt-3">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center border-t border-slate-850/80 pt-3">
           <button
             type="button"
             onClick={() => setActiveTab("rekap")}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center justify-center sm:justify-start space-x-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
               activeTab === "rekap"
                 ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span>Tabel Rekap Slip Gaji Semua Staff</span>
+            <span className="sm:hidden">Rekap Gaji</span>
+            <span className="hidden sm:inline">Tabel Rekap Slip Gaji Semua Staff</span>
             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-900 text-slate-300 border border-slate-800">
               {allStaffCalculatedData.length} Staf
             </span>
@@ -863,14 +864,15 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
           <button
             type="button"
             onClick={() => setActiveTab("kasbon")}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer relative ${
+            className={`flex items-center justify-center sm:justify-start space-x-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition cursor-pointer relative ${
               activeTab === "kasbon"
                 ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-sm"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
             }`}
           >
             <Wallet className="w-4 h-4" />
-            <span>Pusat Persetujuan & ACC Kasbon</span>
+            <span className="sm:hidden">ACC Kasbon</span>
+            <span className="hidden sm:inline">Pusat Persetujuan & ACC Kasbon</span>
             {totalPendingKasbonCount > 0 ? (
               <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.2 rounded-full font-mono animate-pulse">
                 {totalPendingKasbonCount} Butuh ACC
@@ -1551,7 +1553,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 overflow-y-auto space-y-5 text-xs">
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-5 text-xs">
               {/* Event Attended List */}
               <div className="space-y-2">
                 <h4 className="text-xs font-bold uppercase font-mono text-slate-300 flex items-center gap-1.5">

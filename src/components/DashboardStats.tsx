@@ -98,7 +98,7 @@ export default function DashboardStats({ projects, isGuestView = false }: Dashbo
         )}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-      <div id="stat-card-total-projects" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
+      <div id="stat-card-total-projects" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
         <div className="flex justify-between items-start">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Project</span>
           <CalendarRange className="w-4 h-4 text-slate-500" />
@@ -108,7 +108,7 @@ export default function DashboardStats({ projects, isGuestView = false }: Dashbo
         </div>
       </div>
 
-      <div id="stat-card-total-revenue" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
+      <div id="stat-card-total-revenue" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
         <div className="flex justify-between items-start">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Omset Realisasi</span>
           <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -118,7 +118,7 @@ export default function DashboardStats({ projects, isGuestView = false }: Dashbo
         </div>
       </div>
 
-      <div id="stat-card-total-accommodation" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
+      <div id="stat-card-total-accommodation" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
         <div className="flex justify-between items-start">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Biaya Akomodasi</span>
           <Wallet className="w-4 h-4 text-rose-400" />
@@ -128,7 +128,7 @@ export default function DashboardStats({ projects, isGuestView = false }: Dashbo
         </div>
       </div>
 
-      <div id="stat-card-total-staff-fees" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
+      <div id="stat-card-total-staff-fees" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
         <div className="flex justify-between items-start">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Gaji Staf & Talent</span>
           <Users className="w-4 h-4 text-cyan-400" />
@@ -138,7 +138,7 @@ export default function DashboardStats({ projects, isGuestView = false }: Dashbo
         </div>
       </div>
 
-      <div id="stat-card-total-profit" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
+      <div id="stat-card-total-profit" className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between min-h-[110px] shadow-lg shadow-black/20 hover:border-slate-700/80 transition duration-200">
         <div className="flex justify-between items-start">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Profit Bersih Mateha</span>
           <Award className="w-4 h-4 text-amber-500" />

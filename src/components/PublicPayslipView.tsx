@@ -17,7 +17,7 @@ export default function PublicPayslipView({ payslip }: PublicPayslipViewProps) {
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 sm:p-8">
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-lg border border-slate-200">
+      <div className="max-w-2xl mx-auto bg-white p-4 sm:p-8 rounded-lg shadow-lg border border-slate-200">
         <h1 className="text-2xl font-bold text-center text-slate-800 mb-6 font-sans">SLIP GAJI</h1>
         
         <div className="mb-6 border-b pb-4">

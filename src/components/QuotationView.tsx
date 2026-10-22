@@ -521,7 +521,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
       {/* Single Quotation Delete Confirmation Modal */}
       {deleteConfirmQuo && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
+          <div className="bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
             <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-3">
               <Trash2 className="w-5 h-5" />
             </div>
@@ -553,7 +553,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
       {/* Accept Quotation & Generate Invoice Modal */}
       {acceptConfirmQuo && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
+          <div className="bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
               <CheckCircle className="w-5 h-5" />
             </div>
@@ -584,7 +584,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
+          <div className="bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-700 max-w-sm w-full shadow-2xl">
             <h3 className="text-lg font-bold mb-2 text-white">Hapus Semua Penawaran</h3>
             <p className="text-slate-400 text-xs mb-6 leading-relaxed">Apakah Anda yakin ingin menghapus seluruh riwayat quotation? Tindakan ini tidak dapat dibatalkan.</p>
             <div className="flex gap-3 justify-end">
@@ -596,7 +596,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
       )}
 
       {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/50 p-4 sm:p-6 rounded-2xl border border-slate-800">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
             <FileText className="w-6 h-6 text-cyan-400" />
@@ -670,8 +670,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-slate-400 font-semibold block">Nama Klien / Perusahaan *</label>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 mb-1.5">
+              <label className="whitespace-nowrap text-slate-400 font-semibold block">Nama Klien / Perusahaan *</label>
               <ClientSelector
                 clients={clients}
                 onSelectClient={handleSelectClient}
@@ -757,7 +757,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
 
         {/* Bank accounts select */}
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
             <label className="text-xs text-slate-400 font-semibold block">Pilih Rekening Pembayaran yang Dicantumkan:</label>
             <button
               type="button"
@@ -819,7 +819,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
                 {items.length} Item
               </span>
             </h3>
-            <span className="text-[11px] text-slate-400">Deskripsi dapat diedit langsung per item</span>
+            <span className="hidden sm:inline text-[11px] text-slate-400">Deskripsi dapat diedit langsung per item</span>
           </div>
           
           {/* New Item Form */}
@@ -1165,7 +1165,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
       </div>
 
       {/* LIST OF QUOTATIONS */}
-      <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+      <div className="bg-slate-900/50 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <span>Daftar Dokumen Penawaran</span>

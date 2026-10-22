@@ -424,7 +424,7 @@ export default function EditableBudgetTable({
       </div>
 
       {/* Spreadsheet Main Grid Container */}
-      <div className="p-5 space-y-6 overflow-x-auto">
+      <div className="p-4 sm:p-5 space-y-6 overflow-x-auto">
         
         {/* SECTION A: INCOME */}
         <div>
@@ -1366,7 +1366,7 @@ export default function EditableBudgetTable({
 
         {/* TURQUOISE ROW: TOTAL MATEHA'S PROFIT */}
         {userRole !== "staff" && (
-          <div id="mateha-profit-section" className="bg-[#051c24]/40 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 shadow-lg shadow-cyan-950/10">
+          <div id="mateha-profit-section" className="bg-[#051c24]/40 backdrop-blur-md border border-cyan-500/20 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 shadow-lg shadow-cyan-950/10">
           <div className="flex flex-col">
             <span className="text-cyan-400 font-extrabold text-xs tracking-wider uppercase font-sans">
               TOTAL MATEHA'S NET PROFIT

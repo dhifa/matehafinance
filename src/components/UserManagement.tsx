@@ -769,7 +769,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
   return (
     <div className="space-y-6 text-left">
       {/* HEADER HERO */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0c0e12]/80 border border-slate-900 p-6 rounded-2xl shadow-xl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0c0e12]/80 border border-slate-900 p-4 sm:p-6 rounded-2xl shadow-xl">
         <div>
           <h2 className="text-lg font-extrabold text-white tracking-tight flex items-center space-x-2">
             <Users className="w-5 h-5 text-indigo-400" />
@@ -1029,7 +1029,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
       {/* ========================================================================= */}
       {/* SECTION 2: KUSTOMISASI PERAN & HAK AKSES FITUR (ROLE MANAGEMENT) */}
       {/* ========================================================================= */}
-      <div className="bg-[#0c0e12]/80 border border-slate-900 rounded-2xl p-6 shadow-xl space-y-6">
+      <div className="bg-[#0c0e12]/80 border border-slate-900 rounded-2xl p-4 sm:p-6 shadow-xl space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-extrabold text-white tracking-tight flex items-center space-x-2">
@@ -1055,7 +1055,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         <form 
           id="role-management-form"
           onSubmit={handleSaveCustomRole} 
-          className="bg-slate-950/60 border border-slate-850 p-5 rounded-2xl space-y-5 font-sans shadow-inner"
+          className="bg-slate-950/60 border border-slate-850 p-4 sm:p-5 rounded-2xl space-y-5 font-sans shadow-inner"
         >
           {editingRole && (
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-center justify-between">
@@ -1264,7 +1264,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
         {/* Roles Table */}
         <div className="bg-[#0c0e12]/40 rounded-xl border border-slate-900 overflow-hidden">
           {rolesLoading ? (
-            <div className="p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center">
+            <div className="p-4 sm:p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center">
               <Loader2 className="w-5 h-5 animate-spin text-cyan-400 mb-2" />
               <span>Memuat daftar peran...</span>
             </div>
@@ -1378,7 +1378,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
       {/* ========================================================================= */}
       {/* SECTION 3: PRESET PERAN & BIAYA DI RAB (Point D Template) */}
       {/* ========================================================================= */}
-      <div className="bg-[#0c0e12]/80 border border-slate-900 rounded-2xl p-6 shadow-xl space-y-5">
+      <div className="bg-[#0c0e12]/80 border border-slate-900 rounded-2xl p-4 sm:p-6 shadow-xl space-y-5">
         <div>
           <h3 className="text-base font-extrabold text-white tracking-tight flex items-center space-x-2">
             <Briefcase className="w-4 h-4 text-emerald-400" />
@@ -1437,12 +1437,12 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
 
         <div className="bg-[#0c0e12]/40 rounded-xl overflow-hidden border border-slate-900">
           {presetsLoading ? (
-            <div className="p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center">
+            <div className="p-4 sm:p-8 text-center text-slate-500 text-xs flex flex-col items-center justify-center">
               <Loader2 className="w-5 h-5 animate-spin text-emerald-400 mb-2" />
               <span>Memuat preset...</span>
             </div>
           ) : presets.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 text-xs">
+            <div className="p-4 sm:p-8 text-center text-slate-500 text-xs">
               Belum ada master template peran staf diatur.
             </div>
           ) : (
@@ -1492,7 +1492,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#0e1117] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl text-left"
+              className="bg-[#0e1117] border border-slate-800 rounded-2xl max-w-md w-full p-4 sm:p-6 space-y-4 shadow-2xl text-left"
             >
               <div className="flex justify-between items-center pb-3 border-b border-slate-800">
                 <div className="flex items-center space-x-2">
@@ -1845,7 +1845,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#0e1117] border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-left my-8"
+              className="bg-[#0e1117] border border-slate-800 rounded-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl text-left my-8"
             >
               <div className="flex justify-between items-start pb-3 border-b border-slate-800">
                 <div className="flex items-center space-x-2.5">
@@ -2337,7 +2337,7 @@ export default function UserManagement({ currentUserId, onNotify }: UserManageme
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#0e1117] border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl text-left"
+              className="bg-[#0e1117] border border-slate-800 rounded-2xl max-w-sm w-full p-4 sm:p-6 space-y-4 shadow-2xl text-left"
             >
               <div className="flex items-center space-x-2 text-rose-400">
                 <Trash2 className="w-5 h-5" />

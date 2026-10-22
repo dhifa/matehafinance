@@ -421,8 +421,8 @@ export default function KwitansiView({ onNotify }: KwitansiViewProps = {}) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Customer name & Client Selector */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-slate-400 font-bold uppercase tracking-wider text-[10px] font-mono">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 mb-1">
+                <label className="whitespace-nowrap block text-slate-400 font-bold uppercase tracking-wider text-[10px] font-mono">
                   1. Telah Terima Dari (Nama Klien / Perusahaan) *
                 </label>
                 <ClientSelector
@@ -702,7 +702,7 @@ export default function KwitansiView({ onNotify }: KwitansiViewProps = {}) {
 
       {/* DAFTAR KWITANSI TERBIT */}
       <div className="bg-[#0c0e12]/60 border border-slate-800/80 rounded-3xl overflow-hidden shadow-xl">
-        <div className="p-5 bg-[#0f1115]/80 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 bg-[#0f1115]/80 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-2">
             <FileText className="w-4 h-4 text-cyan-400" />
             <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">

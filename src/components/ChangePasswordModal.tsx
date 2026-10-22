@@ -145,7 +145,7 @@ export default function ChangePasswordModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          className="w-full max-w-md bg-[#0f1115] border border-slate-850 rounded-2xl shadow-2xl p-6 text-left relative overflow-hidden"
+          className="w-full max-w-md bg-[#0f1115] border border-slate-850 rounded-2xl shadow-2xl p-4 sm:p-6 text-left relative overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header Bar Accent */}

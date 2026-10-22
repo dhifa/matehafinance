@@ -330,7 +330,7 @@ export default function CollaborationView({
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8 text-left">
         
         {/* EVENT TITLE BLOCK */}
-        <div className="bg-[#111317]/60 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="bg-[#111317]/60 border border-slate-800 p-4 sm:p-6 rounded-2xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <span className="text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
               Shared Project Realisasi
@@ -369,7 +369,7 @@ export default function CollaborationView({
           
           {/* LEFT: ADD NEW ITEM FORM */}
           <div className="lg:col-span-5 space-y-4">
-            <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl flex flex-col space-y-4">
+            <div className="bg-slate-900/40 border border-slate-800 p-4 sm:p-5 rounded-2xl flex flex-col space-y-4">
               
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center space-x-2">

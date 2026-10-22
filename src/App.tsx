@@ -59,9 +59,13 @@ import {
   Menu,
   Minimize2,
   Maximize2,
-  PanelTopClose,
-  PanelTopOpen,
-  KeyRound
+  KeyRound,
+  Receipt,
+  Landmark,
+  Banknote,
+  UserCog,
+  BookUser,
+  FileSignature
 } from "lucide-react";
 import UserManagement from "./components/UserManagement";
 import BackupExport from "./components/BackupExport";
@@ -70,6 +74,7 @@ import ChangePasswordModal from "./components/ChangePasswordModal";
 import NotificationModal, { PopupNotificationState } from "./components/NotificationModal";
 import { setGlobalNotificationListener, notify } from "./utils/notification";
 import logo from "/favicon.png";
+import { Sidebar, MobileTopBar, BottomNav, MobileMenuSheet } from "./components/layout/AppNavigation";
 
 // Firebase operations
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -87,16 +92,16 @@ interface NavTabItem {
 }
 
 const ALL_NAV_TABS: NavTabItem[] = [
-  { id: "sheets", label: "Lembar Kerja Event", shortLabel: "Lembar Kerja", icon: Coins, roles: ["admin", "staff"] },
-  { id: "staff-payslips", label: "Staff Payslip & Kasbon", shortLabel: "Staff Payslip", icon: Wallet, roles: ["admin", "staff"] },
+  { id: "sheets", label: "Lembar Kerja Event", shortLabel: "Event", icon: Coins, roles: ["admin", "staff"] },
+  { id: "staff-payslips", label: "Staff Payslip & Kasbon", shortLabel: "Payslip", icon: Wallet, roles: ["admin", "staff"] },
   { id: "dashboard", label: "Dashboard & Data", shortLabel: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
-  { id: "finance", label: "Keuangan Mateha", shortLabel: "Keuangan", icon: Wallet, roles: ["admin"] },
+  { id: "finance", label: "Keuangan Mateha", shortLabel: "Keuangan", icon: Landmark, roles: ["admin"] },
   { id: "invoice", label: "Invoice", shortLabel: "Invoice", icon: FileText, roles: ["admin", "finance"] },
-  { id: "quotation", label: "Quotation", shortLabel: "Quotation", icon: FileText, roles: ["admin", "finance"] },
-  { id: "kwitansi", label: "Kwitansi", shortLabel: "Kwitansi", icon: FileText, roles: ["admin", "finance"] },
-  { id: "clients", label: "Database Klien", shortLabel: "Klien", icon: Users, roles: ["admin", "finance"] },
-  { id: "payslips", label: "Slip Gaji Staff", shortLabel: "Slip Gaji", icon: FileText, roles: ["admin"] },
-  { id: "users", label: "Manajemen Staff", shortLabel: "Staff", icon: Users, roles: ["admin"] },
+  { id: "quotation", label: "Quotation", shortLabel: "Quotation", icon: FileSignature, roles: ["admin", "finance"] },
+  { id: "kwitansi", label: "Kwitansi", shortLabel: "Kwitansi", icon: Receipt, roles: ["admin", "finance"] },
+  { id: "clients", label: "Database Klien", shortLabel: "Klien", icon: BookUser, roles: ["admin", "finance"] },
+  { id: "payslips", label: "Slip Gaji Staff", shortLabel: "Slip Gaji", icon: Banknote, roles: ["admin"] },
+  { id: "users", label: "Manajemen Staff", shortLabel: "Staff", icon: UserCog, roles: ["admin"] },
 ];
 
 // Local Storage resilient caching helpers for Firestore offline/quota fallback
@@ -142,26 +147,26 @@ export default function App() {
   const [activeProjectId, setActiveProjectId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<TabType>("sheets");
 
-  // Tab Minimize / Responsive State
-  const [isTabsMinimized, setIsTabsMinimized] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("mateha_tabs_minimized");
-      if (saved !== null) return saved === "true";
-      return window.innerWidth < 768; // Default minimized on mobile viewports for clean workspace
+  // Navigation layout state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("mateha_sidebar_collapsed") === "true";
+    } catch {
+      return false;
     }
-    return false;
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isQuotaBannerDismissed, setIsQuotaBannerDismissed] = useState<boolean>(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState<boolean>(false);
 
-  // Toggle Tab Minimize handler
-  const handleToggleMinimizeTabs = (forced?: boolean) => {
-    setIsTabsMinimized((prev) => {
-      const next = forced !== undefined ? forced : !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("mateha_tabs_minimized", String(next));
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      try {
+        localStorage.setItem("mateha_sidebar_collapsed", String(!prev));
+      } catch {
+        // Storage unavailable (private mode); keep in-memory state only
       }
-      return next;
+      return !prev;
     });
   };
 
@@ -1259,253 +1264,65 @@ _Sistem Keuangan Otomatis Mateha Production_`;
     );
   }
 
+  const navUser = {
+    username: userProfile?.username || user?.email?.replace("@mateha.local", "") || "user",
+    role: (userProfile?.role || "staff").toLowerCase(),
+  };
+
+  const handleSelectTab = (id: TabType) => {
+    handleClearShareProject();
+    setActiveTab(id);
+    setIsMobileMenuOpen(false);
+    window.scrollTo({ top: 0 });
+  };
+
   // Standard Dashboard & sheets Workspace
   return (
     <div className="min-h-screen bg-[#080a0f] text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-white">
+      {!!userProfile && (
+        <Sidebar
+          items={availableTabs}
+          activeTab={activeTab}
+          onSelect={handleSelectTab}
+          collapsed={isSidebarCollapsed}
+          onToggleCollapsed={handleToggleSidebar}
+          user={navUser}
+          logo={logo}
+          onChangePassword={() => setIsChangePasswordModalOpen(true)}
+          onLogout={handleLogout}
+        />
+      )}
+
+      <div className={`min-h-screen flex flex-col transition-[padding] duration-200 ${userProfile ? (isSidebarCollapsed ? "lg:pl-[76px]" : "lg:pl-64") : ""}`}>
+      {!!userProfile && (
+        <MobileTopBar title={currentTabItem.label} logo={logo} user={navUser} onOpenMenu={() => setIsMobileMenuOpen(true)} />
+      )}
+
       {/* FIRESTORE QUOTA EXCEEDED NOTICE BANNER */}
-      {isQuotaExceeded && (
-        <div className="bg-amber-950/70 border-b border-amber-600/40 px-4 py-2.5 text-amber-200 text-xs flex flex-wrap items-center justify-between gap-2 shadow-lg">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>
-              <strong>Batas Kuota Baca Harian Firestore Tercapai (Daily Free Read Quota Exceeded).</strong> Data lokal sementara ditampilkan. Kuota akan otomatis di-reset besok, atau Anda dapat meng-upgrade database di Firebase Console.
-            </span>
-          </div>
-          <a
-            href="https://console.firebase.google.com/project/gen-lang-client-0656486078/firestore/databases/ai-studio-d4b4d284-2843-494d-a06e-e71a92b31fd4/data?openUpgradeDialog=true"
-            target="_blank"
-            rel="noreferrer"
-            className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-1 rounded-lg text-[11px] whitespace-nowrap transition"
+      {isQuotaExceeded && !isQuotaBannerDismissed && (
+        <div className="bg-amber-950/60 border-b border-amber-600/30 px-4 py-2 text-amber-200 text-xs flex items-center gap-2.5">
+          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+          <p className="flex-1 min-w-0 leading-snug">
+            <strong className="font-semibold">Kuota baca Firestore harian habis.</strong>{" "}
+            <span className="hidden sm:inline text-amber-200/80">Data dari cache sementara ditampilkan dan akan pulih otomatis besok.</span>{" "}
+            <a
+              href="https://console.firebase.google.com/project/gen-lang-client-0656486078/firestore/databases/ai-studio-d4b4d284-2843-494d-a06e-e71a92b31fd4/data?openUpgradeDialog=true"
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-amber-300 underline underline-offset-2 hover:text-amber-200 whitespace-nowrap"
+            >
+              Upgrade
+            </a>
+          </p>
+          <button
+            onClick={() => setIsQuotaBannerDismissed(true)}
+            className="p-1 rounded-md text-amber-300/80 hover:text-amber-100 hover:bg-amber-500/10 cursor-pointer shrink-0"
+            aria-label="Tutup pemberitahuan"
           >
-            Buka Firebase Console / Upgrade
-          </a>
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
-      
-      {/* GLOBAL HEAD NAVIGATION BAR WITH MINIMIZABLE TABS */}
-      <nav id="navbar" className="border-b border-slate-900/80 bg-[#0c0e12]/95 backdrop-blur-xl sticky top-0 z-40 transition-all duration-200">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between min-h-16 py-2 gap-2">
-            
-            {/* ZONE 1: BRAND IDENTITY & CURRENT TAB BADGE (WHEN MINIMIZED) */}
-            <div className="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0">
-                <img src={logo} alt="Mateha Production" className="w-full h-full object-contain" />
-              </div>
-              <div className="hidden xs:block">
-                <h1 className="text-xs sm:text-sm font-extrabold tracking-tight text-white font-sans flex items-center whitespace-nowrap">
-                  MATEHA PRODUCTION
-                  <span className="ml-1.5 text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1 py-0.5 rounded font-bold uppercase tracking-wider">
-                    PRO
-                  </span>
-                </h1>
-                <p className="text-[8px] sm:text-[9px] text-slate-500 font-mono tracking-wide uppercase">Real-Time Cloud Monitor</p>
-              </div>
-
-              {/* Quick Tab Badge when minimized */}
-              {isTabsMinimized && (
-                <button
-                  onClick={() => handleToggleMinimizeTabs(false)}
-                  className="flex items-center gap-1.5 bg-cyan-500/10 hover:bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold py-1 px-2.5 rounded-xl transition cursor-pointer"
-                  title="Menu tab sedang diminimize. Klik untuk membuka menu tab."
-                >
-                  <currentTabItem.icon className="w-3.5 h-3.5" />
-                  <span className="truncate max-w-[110px] sm:max-w-[160px]">{currentTabItem.shortLabel || currentTabItem.label}</span>
-                  <ChevronDown className="w-3 h-3 text-cyan-400/80" />
-                </button>
-              )}
-            </div>
-
-            {/* ZONE 2: DESKTOP TABS (VISIBLE ON LARGE SCREENS WHEN NOT MINIMIZED) */}
-            {!isTabsMinimized && !!userProfile && (
-              <div className="hidden lg:flex items-center flex-wrap gap-1 bg-slate-950/90 p-1 rounded-2xl border border-slate-900">
-                {availableTabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => {
-                        handleClearShareProject();
-                        setActiveTab(tab.id);
-                      }}
-                      id={`tab-${tab.id}-trigger`}
-                      className={`flex items-center space-x-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition duration-150 cursor-pointer ${
-                        isActive
-                          ? "bg-slate-900 border border-slate-750 text-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.12)] font-bold"
-                          : "text-slate-400 hover:text-white hover:bg-slate-900/50 border border-transparent"
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5 shrink-0" />
-                      <span>{tab.shortLabel || tab.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ZONE 3: CONTROLS (MINIMIZE TOGGLE + USER BADGE + LOGOUT) */}
-            <div className="flex items-center space-x-2 sm:space-x-3 text-xs shrink-0">
-              
-              {/* MINIMIZE / EXPAND TABS TOGGLE BUTTON */}
-              {!!userProfile && (
-                <button
-                  onClick={() => handleToggleMinimizeTabs()}
-                  id="btn-toggle-minimize-tabs"
-                  className={`flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-xl border text-xs font-bold transition duration-150 cursor-pointer ${
-                    isTabsMinimized
-                      ? "bg-slate-900/90 border-slate-700 text-cyan-400 hover:bg-slate-800 hover:border-cyan-500/50"
-                      : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-                  }`}
-                  title={isTabsMinimized ? "Tampilkan Menu Tab" : "Minimize / Sembunyikan Menu Tab"}
-                >
-                  {isTabsMinimized ? (
-                    <>
-                      <PanelTopOpen className="w-3.5 h-3.5 text-cyan-400" />
-                      <span className="hidden sm:inline">Buka Menu Tab</span>
-                    </>
-                  ) : (
-                    <>
-                      <PanelTopClose className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="hidden sm:inline">Minimize Tab</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-              {/* User email & role chip - Click to change password */}
-              <button
-                type="button"
-                onClick={() => setIsChangePasswordModalOpen(true)}
-                id="btn-trigger-change-password-desktop"
-                className="hidden sm:flex items-center space-x-2 bg-slate-950/80 hover:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-900 hover:border-slate-800 text-slate-300 font-mono text-[10px] transition cursor-pointer group"
-                title="Klik untuk ganti kata sandi akun Anda"
-              >
-                <KeyRound className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 transition" />
-                <span className="truncate max-w-[110px]">{user.email?.replace('@mateha.local', '')}</span>
-                <span className={`px-1.5 py-0.5 rounded-md font-extrabold uppercase text-[8px] ${
-                  userProfile?.role === 'admin' 
-                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                    : userProfile?.role === 'finance'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                }`}>
-                  {userProfile?.role || 'staff'}
-                </span>
-              </button>
-
-              {/* Mobile Change Password Button */}
-              <button
-                type="button"
-                onClick={() => setIsChangePasswordModalOpen(true)}
-                id="btn-trigger-change-password-mobile"
-                className="sm:hidden p-2 bg-slate-900 border border-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 rounded-xl transition cursor-pointer"
-                title="Ganti Password Akun"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-              </button>
-              
-              {/* Logout button */}
-              <button
-                onClick={handleLogout}
-                id="btn-trigger-logout"
-                className="flex items-center space-x-1 bg-slate-900 border border-slate-800/80 hover:bg-rose-500/10 hover:text-rose-400 text-slate-400 font-bold py-1.5 px-2.5 sm:px-3 rounded-xl transition cursor-pointer"
-                title="Log out dari sistem keuangan"
-              >
-                <LogOut className="w-3.5 h-3.5 text-slate-500" />
-                <span className="hidden md:inline">Logout</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* EXPANDED TABS PANEL (MOBILE & TABLETS / WHEN NOT MINIMIZED) */}
-        <AnimatePresence>
-          {!isTabsMinimized && !!userProfile && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="border-t border-slate-850/80 bg-[#090b0f] px-3 sm:px-6 lg:px-8 py-3"
-            >
-              <div className="max-w-7xl mx-auto space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold px-1">
-                  <span>PILIH MENU HALAMAN:</span>
-                  <button
-                    onClick={() => handleToggleMinimizeTabs(true)}
-                    className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-bold cursor-pointer transition text-[10px]"
-                  >
-                    <Minimize2 className="w-3 h-3" />
-                    <span>Minimize Tab</span>
-                  </button>
-                </div>
-
-                {/* Grid of Tab buttons */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:hidden gap-1.5 pt-1">
-                  {availableTabs.map((tab) => {
-                    const Icon = tab.icon;
-                    const isActive = activeTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => {
-                          handleClearShareProject();
-                          setActiveTab(tab.id);
-                          // Auto minimize on mobile view after selecting
-                          if (window.innerWidth < 768) {
-                            handleToggleMinimizeTabs(true);
-                          }
-                        }}
-                        id={`mobile-tab-${tab.id}-trigger`}
-                        className={`flex items-center space-x-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition duration-150 cursor-pointer text-left ${
-                          isActive
-                            ? "bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 font-bold shadow-sm"
-                            : "bg-slate-950/60 border border-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
-                        }`}
-                      >
-                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-cyan-400" : "text-slate-500"}`} />
-                        <span className="truncate">{tab.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Mobile User Profile & Change Password Bar */}
-                <div className="pt-2 border-t border-slate-850/60 flex items-center justify-between lg:hidden text-xs">
-                  <div className="flex items-center space-x-2 text-slate-400 text-[11px] font-mono">
-                    <span className="text-white font-bold">@{userProfile?.username || user.email?.replace('@mateha.local', '')}</span>
-                    <span className="text-slate-600">•</span>
-                    <span className="uppercase text-cyan-400 font-extrabold text-[9px]">{userProfile?.role || 'staff'}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsChangePasswordModalOpen(true);
-                      handleToggleMinimizeTabs(true);
-                    }}
-                    className="flex items-center space-x-1 px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-800/40 rounded-lg text-[10px] font-bold transition cursor-pointer"
-                  >
-                    <KeyRound className="w-3 h-3" />
-                    <span>Ganti Password</span>
-                  </button>
-                </div>
-
-                {/* Quick Collapse Footer */}
-                <div className="pt-1 flex justify-center lg:hidden">
-                  <button
-                    onClick={() => handleToggleMinimizeTabs(true)}
-                    className="w-full py-1.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-850 rounded-xl text-[11px] font-bold text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Sembunyikan Menu Tab (Minimize)</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </nav>
 
       {/* GLOBAL POPUP MODAL NOTIFICATION */}
       <NotificationModal 
@@ -1514,7 +1331,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
       />
 
       {/* CORE DISPLAY CANVAS */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-28 lg:pb-10">
         
         {/* COMPACT INTERACTIVE PROJECT SELECTOR / ACTIONS PANEL (Only for sheets & dashboard) */}
         {(activeTab === "sheets" || activeTab === "dashboard") && (
@@ -1523,8 +1340,8 @@ _Sistem Keuangan Otomatis Mateha Production_`;
             
             {/* Project List dropdown / switcher */}
             <div className="flex items-center flex-wrap gap-2.5">
-              <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-slate-500">PILIH EVENT :</span>
-              <div className="flex flex-wrap items-center gap-2">
+              <span className="w-full sm:w-auto text-xs font-semibold text-slate-400">Event aktif</span>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <select
                   value={activeProjectId}
                   onChange={(e) => {
@@ -1532,7 +1349,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                     triggerNotification("Memuat lembar kerja event baru...");
                   }}
                   id="project-selector"
-                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs font-bold py-1.5 px-3.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-cyan-500/50 cursor-pointer font-sans text-left"
+                  className="w-full sm:w-auto sm:max-w-sm min-w-0 bg-slate-950 border border-slate-800 text-slate-200 text-sm sm:text-xs font-bold py-2 sm:py-1.5 px-3.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-cyan-500/50 cursor-pointer font-sans text-left truncate"
                 >
                   {sortedProjects.length === 0 ? (
                     <option value="">(Belum Ada Event)</option>
@@ -1586,7 +1403,6 @@ _Sistem Keuangan Otomatis Mateha Production_`;
 
               {!!userProfile && (
                 <>
-                  <span className="text-xxs uppercase tracking-wider font-mono text-slate-600 font-bold font-sans">atau</span>
 
                   {/* Toggle Form to Add new project */}
                   <button
@@ -1598,7 +1414,6 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                     <span>Buat Event Baru</span>
                   </button>
 
-                  <span className="text-xxs uppercase tracking-wider font-mono text-slate-600 font-bold font-sans">atau</span>
 
                   {/* AI Spreadsheet Upload and Parse Scanner */}
                   <button
@@ -1818,31 +1633,31 @@ _Sistem Keuangan Otomatis Mateha Production_`;
 
 
         {activeTab === "finance" && (
-          <div className="max-w-4xl mx-auto p-6 md:p-8 space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
             <MatehaFinance projects={projects} onNotify={triggerNotification} />
           </div>
         )}
 
         {activeTab === "kwitansi" && (
-          <div className="max-w-4xl mx-auto p-6 md:p-8 space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
             <KwitansiView onNotify={triggerNotification} />
           </div>
         )}
 
         {activeTab === "invoice" && (
-          <div className="max-w-4xl mx-auto p-6 md:p-8 space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
             <InvoiceView onNotify={triggerNotification} />
           </div>
         )}
         
         {activeTab === "quotation" && (
-          <div className="max-w-4xl mx-auto p-6 md:p-8 space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
             <QuotationView onNotify={triggerNotification} />
           </div>
         )}
 
         {activeTab === "clients" && (
-          <div className="max-w-5xl mx-auto p-6 md:p-8 space-y-6">
+          <div className="max-w-6xl mx-auto space-y-6">
             <ClientManagement onNotify={triggerNotification} />
           </div>
         )}
@@ -2184,12 +1999,38 @@ _Sistem Keuangan Otomatis Mateha Production_`;
       </main>
 
       {/* FOOTER FOR BRANDING AND COMPLIANCE */}
-      <footer className="border-t border-slate-900/40 bg-slate-950 py-8 text-xs text-slate-500 mt-16">
-        <div className="max-w-7xl mx-auto px-4 text-center space-y-2">
-          <p>© 2026 Mateha Production. Seluruh Hak Cipta Dilindungi.</p>
-          <p className="text-[10px] text-slate-600 font-mono">SISTEM KEUANGAN TERPADU — MATEHA PRODUCTION FINANCE PLATFORM v2.5</p>
+      <footer className="hidden lg:block border-t border-slate-800/60 py-5 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-8 flex items-center justify-between gap-4">
+          <p>© 2026 Mateha Production</p>
+          <p className="text-slate-600">Sistem Keuangan Terpadu · v2.5</p>
         </div>
       </footer>
+      </div>
+
+      {!!userProfile && (
+        <>
+          <BottomNav
+            items={availableTabs}
+            activeTab={activeTab}
+            onSelect={handleSelectTab}
+            onOpenMenu={() => setIsMobileMenuOpen(true)}
+            menuOpen={isMobileMenuOpen}
+          />
+          <MobileMenuSheet
+            open={isMobileMenuOpen}
+            onClose={() => setIsMobileMenuOpen(false)}
+            items={availableTabs}
+            activeTab={activeTab}
+            onSelect={handleSelectTab}
+            user={navUser}
+            onChangePassword={() => {
+              setIsMobileMenuOpen(false);
+              setIsChangePasswordModalOpen(true);
+            }}
+            onLogout={handleLogout}
+          />
+        </>
+      )}
 
       {/* CUSTOM CONFIRMATION MODAL OVERLAY */}
       <AnimatePresence>

@@ -201,7 +201,7 @@ export const MatehaFinance: React.FC<MatehaFinanceProps> = ({ projects, onNotify
   if (loading) return <div className="text-white">Memuat data keuangan...</div>;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl mb-6">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-xl mb-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Wallet className="w-5 h-5 text-indigo-400" />

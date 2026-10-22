@@ -212,7 +212,7 @@ export default function ReceiptScannerModal({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-grow text-xs">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-grow text-xs">
           
           {/* Upload & Preview Zone */}
           {!imagePreview ? (
@@ -229,7 +229,7 @@ export default function ReceiptScannerModal({
                   handleFileSelect(e.dataTransfer.files[0]);
                 }
               }}
-              className="border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-950/60 hover:bg-slate-900/40 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition group"
+              className="border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-950/60 hover:bg-slate-900/40 rounded-2xl p-4 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition group"
             >
               <input
                 ref={fileInputRef}
@@ -288,7 +288,7 @@ export default function ReceiptScannerModal({
               {/* Status / OCR Summary Box */}
               <div className="md:col-span-8 space-y-3">
                 {isAnalyzing ? (
-                  <div className="p-6 bg-cyan-950/20 border border-cyan-500/30 rounded-2xl flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="p-4 sm:p-6 bg-cyan-950/20 border border-cyan-500/30 rounded-2xl flex flex-col items-center justify-center text-center space-y-3">
                     <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
                     <div>
                       <h3 className="font-bold text-white text-xs font-mono uppercase">AI Sedang Membaca Struk...</h3>

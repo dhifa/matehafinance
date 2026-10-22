@@ -430,7 +430,7 @@ export default function BankManagementModal({
             ))}
 
             {banks.length === 0 && !isAdding && (
-              <div className="p-8 text-center bg-slate-950/40 border border-dashed border-slate-850 rounded-2xl space-y-3">
+              <div className="p-4 sm:p-8 text-center bg-slate-950/40 border border-dashed border-slate-850 rounded-2xl space-y-3">
                 <Building2 className="w-10 h-10 text-slate-600 mx-auto" />
                 <div>
                   <p className="text-sm font-bold text-slate-300">Belum ada rekening bank yang didaftarkan</p>

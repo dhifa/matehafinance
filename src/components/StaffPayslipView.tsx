@@ -905,7 +905,7 @@ export default function StaffPayslipView({
       />
 
       {/* HEADER HERO */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-[#0c0e12]/80 border border-slate-900 p-6 rounded-2xl shadow-xl">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-[#0c0e12]/80 border border-slate-900 p-4 sm:p-6 rounded-2xl shadow-xl">
         <div>
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center font-bold shadow-inner">
@@ -1046,7 +1046,7 @@ export default function StaffPayslipView({
           </div>
 
           {/* FILTER CONTROLS & PRINT BAR */}
-          <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800/80 p-5 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-4">
+          <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800/80 p-4 sm:p-5 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <div>
                 <label className="block text-slate-400 font-bold mb-1 uppercase tracking-wider text-[9px] font-mono">Tahun</label>
@@ -1805,7 +1805,7 @@ export default function StaffPayslipView({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* LEFT: FORM PENGAJUAN KASBON */}
             <div className="lg:col-span-5 space-y-4">
-              <div className="bg-[#0c0e12]/80 border border-slate-900 p-6 rounded-2xl shadow-xl space-y-4">
+              <div className="bg-[#0c0e12]/80 border border-slate-900 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
                 <div className="flex items-center space-x-2 pb-3 border-b border-slate-900">
                   <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
                     <Wallet className="w-4 h-4" />
@@ -2185,7 +2185,7 @@ export default function StaffPayslipView({
 
             {/* RIGHT: RIWAYAT PENGAJUAN KASBON */}
             <div className="lg:col-span-7 space-y-4">
-              <div className="bg-[#0c0e12]/80 border border-slate-900 p-6 rounded-2xl shadow-xl space-y-4">
+              <div className="bg-[#0c0e12]/80 border border-slate-900 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-900">
                   <div>
                     <h3 className="text-sm font-extrabold text-white">
@@ -2206,7 +2206,7 @@ export default function StaffPayslipView({
                     <span>Memuat daftar kasbon...</span>
                   </div>
                 ) : myKasbonRequests.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-dashed border-slate-900">
+                  <div className="p-4 sm:p-8 text-center text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-dashed border-slate-900">
                     Belum ada riwayat pengajuan kasbon.
                   </div>
                 ) : (
@@ -2341,7 +2341,7 @@ export default function StaffPayslipView({
       {/* ========================================================================= */}
       {isAddReimburseOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c0e12] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 text-left">
+          <div className="bg-[#0c0e12] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl p-4 sm:p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 text-left">
             <div className="flex justify-between items-center pb-3 border-b border-slate-850">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold">
