@@ -114,4 +114,4 @@ lain, isi `CORS_ALLOWED_ORIGINS` di `.env` dan set `VITE_API_BASE_URL` saat buil
 | "Tabel pengaturan belum ada di database" | Jalankan `php spark migrate` di folder `backend` (wajib setiap kali pull versi baru). |
 | Tes Koneksi Gemini: "PHP di server tidak bisa memverifikasi sertifikat SSL Google" (umum di XAMPP/Laragon Windows) | Unduh <https://curl.se/ca/cacert.pem>, simpan mis. di `C:\php\cacert.pem`, lalu di `php.ini` isi `curl.cainfo = "C:\php\cacert.pem"` dan `openssl.cafile = "C:\php\cacert.pem"`. Restart `php spark serve`. Cek lokasi php.ini dengan `php --ini`. |
 | Tes Koneksi: "API key ditolak oleh Google" | Key salah/terhapus atau Gemini API belum aktif untuk project-nya. Buat key baru di Google AI Studio. |
-| Backend jalan di port lain | Buat file `.env.local` di folder utama berisi `BACKEND_URL="http://127.0.0.1:PORT"`, lalu restart `npm run dev`. |
+| Backend jalan di port lain | Buat file `.env.local` di folder utama berisi `BACKEND_URL="http://localhost:PORT"`, lalu restart `npm run dev`. |

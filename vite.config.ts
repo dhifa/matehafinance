@@ -19,7 +19,8 @@ export default defineConfig(({mode}) => {
       // Forward API calls to the CodeIgniter 4 backend (cd backend && php spark serve)
       proxy: {
         '/api': {
-          target: env.BACKEND_URL || 'http://127.0.0.1:8080',
+          // localhost lets Node try both IPv6 (::1, what php spark serve uses on Windows) and IPv4
+          target: env.BACKEND_URL || 'http://localhost:8080',
           changeOrigin: true,
           configure: (proxy) => {
             // Explain a stopped backend in the app instead of a bare 500
