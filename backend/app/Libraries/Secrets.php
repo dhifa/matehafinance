@@ -53,6 +53,20 @@ class Secrets
         return ($stored !== null && $stored !== '') ? $stored : config(Mateha::class)->geminiApiKey;
     }
 
+    /**
+     * Human readable explanation for a failed HTTPS call to Google (common on Windows PHP installs).
+     */
+    public static function explainConnectionError(\Throwable $e): string
+    {
+        $msg = $e->getMessage();
+        if (stripos($msg, 'SSL') !== false || stripos($msg, 'certificate') !== false || preg_match('/error (60|77)\b/', $msg)) {
+            return 'PHP di server tidak bisa memverifikasi sertifikat SSL Google. Unduh cacert.pem (https://curl.se/ca/cacert.pem), '
+                . 'lalu isi "curl.cainfo" dan "openssl.cafile" di php.ini dengan lokasi file itu, kemudian restart "php spark serve".';
+        }
+
+        return 'Server tidak bisa menghubungi Google Gemini: ' . $msg;
+    }
+
     public static function mask(string $value): string
     {
         $len = strlen($value);

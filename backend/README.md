@@ -105,3 +105,13 @@ lain, isi `CORS_ALLOWED_ORIGINS` di `.env` dan set `VITE_API_BASE_URL` saat buil
   staf tidak bisa mengubah peran sendiri, profil anggota lain hanya menampilkan nama/peran, dan tamu di link
   berbagi hanya bisa menambah pengeluaran Point B.
 - Fitur "live" (mis. halaman kolaborasi) diperbarui otomatis tiap ±5 detik (polling).
+
+## Pemecahan masalah
+
+| Gejala | Penyebab & solusi |
+|---|---|
+| Terminal Vite menampilkan `http proxy error ... ECONNREFUSED`, atau aplikasi menampilkan "Server backend tidak berjalan" | Backend belum jalan. Buka terminal kedua: `cd backend` lalu `php spark serve`, dan biarkan tetap terbuka. Aplikasi butuh dua terminal: `php spark serve` (port 8080) dan `npm run dev` (port 3000). |
+| "Tabel pengaturan belum ada di database" | Jalankan `php spark migrate` di folder `backend` (wajib setiap kali pull versi baru). |
+| Tes Koneksi Gemini: "PHP di server tidak bisa memverifikasi sertifikat SSL Google" (umum di XAMPP/Laragon Windows) | Unduh <https://curl.se/ca/cacert.pem>, simpan mis. di `C:\php\cacert.pem`, lalu di `php.ini` isi `curl.cainfo = "C:\php\cacert.pem"` dan `openssl.cafile = "C:\php\cacert.pem"`. Restart `php spark serve`. Cek lokasi php.ini dengan `php --ini`. |
+| Tes Koneksi: "API key ditolak oleh Google" | Key salah/terhapus atau Gemini API belum aktif untuk project-nya. Buat key baru di Google AI Studio. |
+| Backend jalan di port lain | Buat file `.env.local` di folder utama berisi `BACKEND_URL="http://127.0.0.1:PORT"`, lalu restart `npm run dev`. |

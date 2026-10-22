@@ -19,8 +19,21 @@ export default defineConfig(({mode}) => {
       // Forward API calls to the CodeIgniter 4 backend (cd backend && php spark serve)
       proxy: {
         '/api': {
-          target: env.BACKEND_URL || 'http://localhost:8080',
+          target: env.BACKEND_URL || 'http://127.0.0.1:8080',
           changeOrigin: true,
+          configure: (proxy) => {
+            // Explain a stopped backend in the app instead of a bare 500
+            proxy.on('error', (_err, _req, res) => {
+              const out = res as import('http').ServerResponse;
+              if (!out.headersSent) {
+                out.writeHead(503, {'Content-Type': 'application/json'});
+              }
+              out.end(JSON.stringify({
+                error: 'Server backend tidak berjalan. Buka terminal baru, masuk ke folder backend, lalu jalankan: php spark serve',
+                code: 'backend-unavailable',
+              }));
+            });
+          },
         },
       },
     },
