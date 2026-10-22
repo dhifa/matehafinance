@@ -50,6 +50,9 @@ class Mateha extends BaseConfig
     /** Gemini models tried in order; overridable with `mateha.geminiModels` in .env (comma separated). */
     public string $geminiModels = 'gemini-flash-latest,gemini-3.7-flash,gemini-3.1-flash-lite,gemini-3.1-pro-preview';
 
+    /** Faster models first for the chat assistant (short text extraction); overridable with `mateha.geminiChatModels`. */
+    public string $geminiChatModels = 'gemini-flash-lite-latest,gemini-flash-latest,gemini-3.1-flash-lite';
+
     public string $geminiApiKey = '';
 
     public function __construct()

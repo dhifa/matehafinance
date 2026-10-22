@@ -98,7 +98,7 @@ class AiAssistant extends BaseApiController
         ];
 
         try {
-            $result = GeminiClient::generateJson([['text' => $context]], self::INSTRUCTION, $schema, 60);
+            $result = GeminiClient::generateJson([['text' => $context]], self::INSTRUCTION, $schema, 45, config(\Config\Mateha::class)->geminiChatModels);
         } catch (RuntimeException $e) {
             return $this->fail(502, 'ai-error', $e->getMessage());
         } catch (Throwable $e) {

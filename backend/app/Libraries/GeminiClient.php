@@ -15,15 +15,18 @@ class GeminiClient
     /**
      * @param list<array<string, mixed>> $parts  user content parts (text and/or inlineData)
      * @param array<string, mixed>       $schema responseSchema
+     * @param string|null                $models comma separated models to try (default: Mateha::$geminiModels)
      *
      * @return mixed decoded JSON returned by the model
      */
-    public static function generateJson(array $parts, string $instruction, array $schema, int $timeout = 120): mixed
+    public static function generateJson(array $parts, string $instruction, array $schema, int $timeout = 120, ?string $models = null): mixed
     {
-        // Trying several models can exceed php.ini's default 30s request limit
-        @set_time_limit(max(180, $timeout * 3));
+        $config     = config(Mateha::class);
+        $modelList  = array_values(array_filter(array_map('trim', explode(',', $models ?? $config->geminiModels))));
 
-        $config = config(Mateha::class);
+        // Trying several models can exceed php.ini's default 30s request limit
+        @set_time_limit(count($modelList) * ($timeout + 5) + 30);
+
         try {
             $apiKey = Secrets::geminiApiKey();
         } catch (Throwable) {
@@ -40,16 +43,24 @@ class GeminiClient
             'generationConfig'  => ['responseMimeType' => 'application/json', 'responseSchema' => $schema],
         ];
 
-        $client    = service('curlrequest', ['timeout' => $timeout, 'http_errors' => false, 'verify' => Secrets::caBundle()]);
+        $client    = service('curlrequest', ['timeout' => $timeout, 'connect_timeout' => 10, 'http_errors' => false, 'verify' => Secrets::caBundle()]);
         $lastError = 'Layanan AI sedang mengalami lonjakan trafik sementara. Silakan coba lagi.';
 
-        foreach (array_filter(array_map('trim', explode(',', $config->geminiModels))) as $model) {
+        foreach ($modelList as $model) {
             try {
                 $response = $client->post(
                     'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent',
                     ['headers' => ['Content-Type' => 'application/json', 'x-goog-api-key' => $apiKey], 'body' => json_encode($payload)]
                 );
             } catch (Throwable $e) {
+                // A slow model only affects itself: try the next one
+                if (preg_match('/\b28\b|timed out/i', $e->getMessage())) {
+                    $lastError = "Model AI terlalu lama merespons (lebih dari {$timeout} detik). Coba lagi sebentar lagi.";
+                    log_message('warning', '[Gemini Fallback] {model} timed out', ['model' => $model]);
+
+                    continue;
+                }
+
                 // Connection/SSL problems affect every model equally, so stop here
                 throw new RuntimeException(Secrets::explainConnectionError($e));
             }
