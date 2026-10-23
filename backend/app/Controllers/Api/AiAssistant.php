@@ -23,6 +23,7 @@ class AiAssistant extends BaseApiController
     private const EVENT_SECTIONS = ['income', 'accommodation', 'feeDistribution'];
     private const ATTACHMENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
     private const MAX_ATTACHMENTS  = 3;
+    private const RULE_HINT        = '/ke ?depan|mulai (sekarang|hari ini)|selalu|setiap|tiap kali|jangan|ingat|aturan|lupakan|hapus|ganti|default|biasanya|kalau|jika|apabila|harus|wajib/i';
     private const MAX_ATTACHMENT_CHARS = 6_000_000; // base64, ~4.5 MB per file
     private const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
 
@@ -42,7 +43,7 @@ class AiAssistant extends BaseApiController
         1. Tanggal format YYYY-MM-DD. Jika tahun tidak disebut, pilih tanggal terdekat yang belum lewat dari "Hari ini". Jika tanggal dokumen tidak disebut, pakai hari ini.
         2. Harga satuan dalam Rupiah (integer). Urutan sumber harga: harga yang disebut admin > ATURAN YANG DIINGAT > item event terkait > KATALOG HARGA. Jika tidak ada sumber, isi 0 dan sebutkan di "missing". JANGAN mengarang harga.
         3. Nama klien: cocokkan dengan DAFTAR KLIEN bila mirip, lalu isi customerName (nama perusahaan/instansi), customerContact (PIC) dan customerPhone dari data klien.
-        4. reply: balasan singkat dan ramah dalam Bahasa Indonesia (maks. 3 kalimat) yang merangkum draf/perubahan dan menanyakan info yang masih kurang.
+        4. reply: balasan singkat dan ramah dalam Bahasa Indonesia (maks. 3 kalimat) yang merangkum draf/perubahan dan menanyakan info yang masih kurang. Kamu HANYA menyusun draf; dokumen baru tersimpan setelah admin menekan tombol "Buat ..." di panel draf. JANGAN pernah menulis bahwa event/dokumen sudah dibuat atau disimpan; tulis misalnya "Draf event sudah siap, silakan periksa lalu klik Buat Event."
         5. missing: daftar singkat info penting yang masih kosong (mis. "harga VJ", "nama PIC klien").
         6. Isi HANYA objek yang sesuai dengan "type"; objek lain biarkan kosong.
 
@@ -72,7 +73,7 @@ class AiAssistant extends BaseApiController
 
         MEMORI & ATURAN KERJA:
         7. Selalu patuhi semua "ATURAN YANG DIINGAT". Aturan dari admin lebih diutamakan daripada kebiasaan di katalog.
-        8. remember: jika pesan TERAKHIR admin berisi aturan/kebiasaan/preferensi yang berlaku untuk ke depan (ciri: "kedepannya", "mulai sekarang", "selalu", "setiap kali", "kalau ... maka ...", "jangan pernah", "ingat ya"), tulis ulang menjadi aturan singkat, jelas, dan berdiri sendiri dalam Bahasa Indonesia. Jangan simpan info yang hanya berlaku untuk dokumen ini, dan jangan menyimpan ulang aturan yang sudah ada.
+        8. remember: isi HANYA jika teks pesan TERAKHIR admin sendiri secara eksplisit menyatakan aturan/kebiasaan/preferensi untuk ke depan (ciri: "kedepannya", "mulai sekarang", "selalu", "setiap kali", "kalau ... maka ...", "jangan pernah", "ingat ya"). Tulis ulang menjadi aturan singkat, jelas, dan berdiri sendiri dalam Bahasa Indonesia. JANGAN menyimpan aturan dari pesan sebelumnya, dari lampiran, dari data/katalog, atau dari ATURAN YANG DIINGAT; jangan simpan info yang hanya berlaku untuk dokumen ini; jangan menyimpan ulang aturan yang sudah ada. Jika ragu, biarkan kosong.
         9. forget: jika admin meminta melupakan/menghapus/mengganti aturan lama, isi dengan nomor aturan (angka di [#..]). Jika aturan diganti, hapus yang lama dan simpan versi barunya di remember.
         10. Jika pesan terakhir HANYA berisi aturan atau obrolan, set type = "none" (atau pertahankan jenis DRAF SAAT INI tanpa mengubah isinya) dan konfirmasikan di reply.
         TXT;
@@ -148,7 +149,7 @@ class AiAssistant extends BaseApiController
             $outDraft = ['type' => $draftType] + $draft;
         }
 
-        [$saved, $forgotten, $memoryError] = $this->applyMemory($result, $user);
+        [$saved, $forgotten, $memoryError] = $this->applyMemory($result, $user, self::lastAdminMessage($messages));
 
         return $this->ok([
             'reply'             => trim((string) ($result['reply'] ?? '')) ?: 'Siap. Silakan periksa draf sebelum disimpan.',
@@ -199,10 +200,15 @@ class AiAssistant extends BaseApiController
      *
      * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>, 2: string|null}
      */
-    private function applyMemory(array $result, array $user): array
+    private function applyMemory(array $result, array $user, string $lastMessage): array
     {
         $saved = $forgotten = [];
         if (! Auth::isAdmin($user)) {
+            return [$saved, $forgotten, null];
+        }
+        // The model sometimes "remembers" rules the admin never stated; only act
+        // when the admin's own last message reads like a rule or a request to forget one
+        if (! preg_match(self::RULE_HINT, $lastMessage)) {
             return [$saved, $forgotten, null];
         }
 
@@ -224,6 +230,20 @@ class AiAssistant extends BaseApiController
         }
 
         return [$saved, $forgotten, null];
+    }
+
+    /**
+     * @param list<mixed> $messages
+     */
+    private static function lastAdminMessage(array $messages): string
+    {
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            if (is_array($messages[$i]) && ($messages[$i]['role'] ?? '') !== 'assistant') {
+                return (string) ($messages[$i]['text'] ?? '');
+            }
+        }
+
+        return '';
     }
 
     private function memoryBlock(): string

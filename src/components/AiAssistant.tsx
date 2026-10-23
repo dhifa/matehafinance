@@ -47,6 +47,8 @@ interface ChatMessage {
   text: string;
   /** names of attached files (the files themselves are not kept) */
   attachments?: string[];
+  /** set when this reply came with a draft */
+  draftType?: Draft["type"];
   saved?: Memory[];
   forgotten?: Memory[];
 }
@@ -126,6 +128,7 @@ export default function AiAssistant({
   const [error, setError] = useState<string | null>(null);
   const [showMemory, setShowMemory] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const draftRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -187,7 +190,13 @@ export default function AiAssistant({
       });
       setMessages([
         ...next,
-        { role: "assistant", text: res.reply, saved: res.memoriesSaved, forgotten: res.memoriesForgotten },
+        {
+          role: "assistant",
+          text: res.reply,
+          ...(res.draft ? { draftType: res.draft.type } : {}),
+          saved: res.memoriesSaved,
+          forgotten: res.memoriesForgotten,
+        },
       ]);
       setDraft(res.draft);
       setMissing(res.draft ? res.missing || [] : []);
@@ -342,6 +351,20 @@ export default function AiAssistant({
                     </div>
                   )}
                 </div>
+                {m.draftType && draft?.type === m.draftType && i === messages.length - 1 && (
+                  <div className="ml-9 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
+                    <span className="flex-1 min-w-[10rem]">
+                      {TYPE_META[m.draftType].label} siap. Belum tersimpan sampai Anda klik <strong>{TYPE_META[m.draftType].action}</strong>.
+                    </span>
+                    <button
+                      onClick={() => draftRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      className="shrink-0 rounded-lg bg-emerald-500 hover:bg-emerald-400 px-2.5 py-1 font-semibold text-slate-950 cursor-pointer"
+                    >
+                      Lihat draf
+                    </button>
+                  </div>
+                )}
                 {(m.saved || []).map((mem) => (
                   <div key={`s${mem.id}`} className="ml-9 flex items-start gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-100">
                     <Pin className="w-3.5 h-3.5 mt-px shrink-0 text-violet-300" />
@@ -476,7 +499,7 @@ export default function AiAssistant({
 
         {/* Draft preview */}
         {draft && (
-          <div className="border-t lg:border-t-0 lg:border-l border-slate-800/80 bg-slate-950/40 px-4 sm:px-6 py-4 space-y-4">
+          <div ref={draftRef} className="scroll-mt-4 border-t lg:border-t-0 lg:border-l border-slate-800/80 bg-slate-950/40 px-4 sm:px-6 py-4 space-y-4">
             <DraftPreview draft={draft} />
 
             {missing.length > 0 && (
