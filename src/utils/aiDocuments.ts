@@ -1,6 +1,7 @@
 import { collection, doc, getDocs, setDoc, updateDoc } from "../lib/firestore";
 import { db, sanitizeForFirestore } from "./backend";
 import { terbilang } from "./numberToWords";
+import { normalizeItem } from "./lineItems";
 import { Bank, Invoice, Kwitansi, Quotation } from "../types";
 
 /**
@@ -12,8 +13,11 @@ import { Bank, Invoice, Kwitansi, Quotation } from "../types";
 export interface AiDocItem {
   description: string;
   qty: number;
+  unit?: string;
   days?: number;
+  timeUnit?: string;
   price: number;
+  subItems?: { description: string; qty?: number; unit?: string; price?: number }[];
 }
 
 export interface AiInvoiceDraft {
@@ -72,14 +76,26 @@ async function defaultBanks(): Promise<Bank[]> {
 }
 
 function toItems(items: AiDocItem[]) {
-  return items.map((item, idx) => ({
-    id: `item_${idx}_${Date.now()}`,
-    description: item.description.trim(),
-    qty: Number(item.qty) || 1,
-    days: Number(item.days) || 1,
-    price: Number(item.price) || 0,
-    total: (Number(item.qty) || 1) * (Number(item.days) || 1) * (Number(item.price) || 0),
-  }));
+  return items.map((item, idx) =>
+    normalizeItem(
+      {
+        description: item.description,
+        qty: item.qty,
+        unit: item.unit || "",
+        days: item.days || 1,
+        timeUnit: item.timeUnit || "",
+        price: item.price,
+        subItems: (item.subItems || []).map((sub, j) => ({
+          id: `sub_${idx}_${j}_${Date.now()}`,
+          description: sub.description,
+          qty: sub.qty || 1,
+          unit: sub.unit || "",
+          price: sub.price || 0,
+        })),
+      },
+      `item_${idx}_${Date.now()}`,
+    ),
+  );
 }
 
 export async function createInvoiceFromDraft(draft: AiInvoiceDraft): Promise<Invoice> {

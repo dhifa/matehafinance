@@ -49,7 +49,8 @@ class AiAssistant extends BaseApiController
         - feeDistribution (D. Fee Kru): hanya jika admin menyebut kru/honor/nama orang; notes = inisial/nama kru.
 
         INVOICE (objek "invoice") dan QUOTATION (objek "quotation"):
-        - items: layanan yang ditagihkan/ditawarkan (description, qty, days, price). days = jumlah hari layanan (default 1); total item = qty × days × price, jadi price adalah harga satuan per hari. Contoh "3 kamera 2 hari @2jt" = qty 3, days 2, price 2000000. Jika event berlangsung beberapa tanggal dan harganya per hari, isi days sesuai jumlah tanggal. Jika admin menyebut event dari DAFTAR EVENT, ambil item dari Pemasukan (RAB) event tersebut beserta harganya, dan subject = "<jenis layanan> - <nama event>".
+        - items: layanan yang ditagihkan/ditawarkan. Field: description (nama item), qty + unit (satuan qty, mis. "unit", "m", "set", "package"; kosongkan jika tidak jelas), days + timeUnit (waktu, mis. 2 "hari", 1 "event"; default days 1 dan timeUnit kosong), price (harga satuan). Total item = qty × days × price. Contoh "3 kamera 2 hari @2jt" = qty 3, unit "unit", days 2, timeUnit "hari", price 2000000. Jika event berlangsung beberapa tanggal dan harganya per hari, isi days sesuai jumlah tanggal.
+        - subItems: poin rincian isi sebuah item (mis. Sound System berisi "mic wireless" 4 unit, "mixer dan operator" 1 set). Isi price pada poin HANYA jika poin itu biaya tambahan (add-cost) di luar harga item; jika sudah termasuk, price 0. Jika admin menyebut event dari DAFTAR EVENT, ambil item dari Pemasukan (RAB) event tersebut beserta harganya, dan subject = "<jenis layanan> - <nama event>".
         - invoice.dueDate opsional; invoice DP/uang muka: isDp = true dan dpPercent (mis. 50). Invoice pelunasan dari invoice DP: items sama, isDp = false, dan sebutkan sisa tagihan di reply.
         - quotation.validUntil: jika tidak disebut, 14 hari setelah tanggal quotation.
         - termsAndConditions: isi hanya jika admin menyebut syarat khusus.
@@ -287,7 +288,19 @@ class AiAssistant extends BaseApiController
         ];
         $docItem = [
             'type'       => 'OBJECT',
-            'properties' => ['description' => ['type' => 'STRING'], 'qty' => ['type' => 'INTEGER'], 'days' => ['type' => 'INTEGER'], 'price' => ['type' => 'INTEGER']],
+            'properties' => [
+                'description' => ['type' => 'STRING'],
+                'qty'         => ['type' => 'INTEGER'],
+                'unit'        => ['type' => 'STRING'],
+                'days'        => ['type' => 'INTEGER'],
+                'timeUnit'    => ['type' => 'STRING'],
+                'price'       => ['type' => 'INTEGER'],
+                'subItems'    => ['type' => 'ARRAY', 'items' => [
+                    'type'       => 'OBJECT',
+                    'properties' => ['description' => ['type' => 'STRING'], 'qty' => ['type' => 'INTEGER'], 'unit' => ['type' => 'STRING'], 'price' => ['type' => 'INTEGER']],
+                    'required'   => ['description', 'qty', 'price'],
+                ]],
+            ],
             'required'   => ['description', 'qty', 'days', 'price'],
         ];
         $customer = [
@@ -351,7 +364,21 @@ class AiAssistant extends BaseApiController
             $out = [];
             foreach (array_slice(is_array($rows) ? $rows : [], 0, 50) as $r) {
                 if (is_array($r) && ($desc = $str($r['description'] ?? '', 500)) !== '') {
-                    $out[] = ['description' => $desc, 'qty' => $int($r['qty'] ?? 1, 1, 10000), 'days' => $int($r['days'] ?? 1, 1, 366), 'price' => $int($r['price'] ?? 0, 0, 10_000_000_000)];
+                    $subs = [];
+                    foreach (array_slice(is_array($r['subItems'] ?? null) ? $r['subItems'] : [], 0, 30) as $sub) {
+                        if (is_array($sub) && ($subDesc = $str($sub['description'] ?? '', 200)) !== '') {
+                            $subs[] = ['description' => $subDesc, 'qty' => $int($sub['qty'] ?? 1, 1, 10000), 'unit' => $str($sub['unit'] ?? '', 20), 'price' => $int($sub['price'] ?? 0, 0, 10_000_000_000)];
+                        }
+                    }
+                    $out[] = [
+                        'description' => $desc,
+                        'qty'         => $int($r['qty'] ?? 1, 1, 10000),
+                        'unit'        => $str($r['unit'] ?? '', 20),
+                        'days'        => $int($r['days'] ?? 1, 1, 366),
+                        'timeUnit'    => $str($r['timeUnit'] ?? '', 20),
+                        'price'       => $int($r['price'] ?? 0, 0, 10_000_000_000),
+                        'subItems'    => $subs,
+                    ];
                 }
             }
 

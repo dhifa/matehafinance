@@ -42,13 +42,25 @@ export interface Client {
   updatedAt?: string;
 }
 
+/** A detail line under an item ("poin"). A price makes it an add-cost on top of the item. */
+export interface LineSubItem {
+  id: string;
+  description: string;
+  qty?: number;
+  unit?: string;
+  price?: number; // empty/0 = no add-cost
+}
+
 export interface QuotationItem {
   id: string;
   description: string;
   qty: number;
+  unit?: string; // e.g. "m", "unit", "package"
   price: number;
-  days?: number; // number of days; total = qty × days × price (missing = 1 day)
-  total: number;
+  days?: number; // time amount (missing = 1)
+  timeUnit?: string; // e.g. "hari", "event", "days"
+  subItems?: LineSubItem[];
+  total: number; // qty × days × price + sub-item add-costs
 }
 
 export interface Quotation {
@@ -73,14 +85,7 @@ export interface Quotation {
   clientApprovalTitle?: string;
 }
 
-export interface InvoiceItem {
-  id: string;
-  description: string;
-  qty: number;
-  price: number;
-  days?: number; // number of days; total = qty × days × price (missing = 1 day)
-  total: number;
-}
+export type InvoiceItem = QuotationItem;
 
 export interface Invoice {
   id: string;

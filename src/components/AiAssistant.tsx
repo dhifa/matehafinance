@@ -7,6 +7,7 @@ import { apiFetch } from "../lib/api";
 import { formatRupiah } from "../types";
 import { formatDateString, formatMultiDates } from "../utils/date";
 import { terbilang } from "../utils/numberToWords";
+import { formatQty, formatTime, lineItemTotal, subItemAmount } from "../utils/lineItems";
 import {
   AiDocItem, AiInvoiceDraft, AiKwitansiDraft, AiQuotationDraft,
   createInvoiceFromDraft, createKwitansiFromDraft, createQuotationFromDraft,
@@ -77,7 +78,7 @@ const EXAMPLES = [
 ];
 
 const eventSum = (rows: AiDraftItem[]) => rows.reduce((s, r) => s + r.qty * r.expense, 0);
-const docSum = (rows: AiDocItem[]) => rows.reduce((s, r) => s + r.qty * (r.days || 1) * r.price, 0);
+const docSum = (rows: AiDocItem[]) => rows.reduce((s, r) => s + lineItemTotal(r), 0);
 
 function canCreate(d: Draft): boolean {
   if (d.type === "event") return !!d.name.trim();
@@ -495,7 +496,7 @@ function ItemList({
   title: string;
   tone: string;
   total: number;
-  rows: { description: string; qty: number; days?: number; price: number; note?: string }[];
+  rows: AiDocItem[] | { description: string; qty: number; price: number; note?: string }[];
 }) {
   return (
     <div>
@@ -509,11 +510,19 @@ function ItemList({
             <div className="min-w-0">
               <p className="text-slate-100 font-medium break-words whitespace-pre-line">{r.description}</p>
               <p className="text-slate-500 tabular-nums">
-                {r.qty}{(r.days || 1) > 1 && ` × ${r.days} hari`} × {r.price > 0 ? formatRupiah(r.price) : <span className="text-amber-300">harga belum ada</span>}
-                {r.note ? ` · ${r.note}` : ""}
+                {formatQty(r.qty, "unit" in r ? r.unit : undefined)}
+                {"days" in r && ((r.days || 1) > 1 || r.timeUnit) && ` × ${formatTime(r.days, r.timeUnit)}`}
+                {" × "}{r.price > 0 ? formatRupiah(r.price) : <span className="text-amber-300">harga belum ada</span>}
+                {"note" in r && r.note ? ` · ${r.note}` : ""}
               </p>
+              {"subItems" in r && (r.subItems || []).map((sub, j) => (
+                <p key={j} className="text-slate-400 pl-2 border-l border-slate-700">
+                  {sub.description} ({formatQty(sub.qty, sub.unit)})
+                  {subItemAmount(sub) > 0 && <span className="text-amber-300"> + {formatRupiah(subItemAmount(sub))}</span>}
+                </p>
+              ))}
             </div>
-            <span className="shrink-0 text-slate-200 tabular-nums">{formatRupiah(r.qty * (r.days || 1) * r.price)}</span>
+            <span className="shrink-0 text-slate-200 tabular-nums">{formatRupiah(lineItemTotal(r))}</span>
           </div>
         ))}
       </div>

@@ -8,6 +8,7 @@ import { terbilang } from "../utils/numberToWords";
 import { Download, Printer, FileText, Loader2, Copy, Check, UserCheck, Trash2 } from "lucide-react";
 import QuotationDocument from "./documents/QuotationDocument";
 import DocumentPreviewShell, { primaryToolbarButton, toolbarButton } from "./documents/DocumentPreviewShell";
+import { itemSummaryText } from "../utils/lineItems";
 
 export default function QuotationPreview({
   quotation,
@@ -48,7 +49,7 @@ export default function QuotationPreview({
 
   const copySummaryForWA = () => {
     let itemsText = quotation.items.map((item, idx) => {
-      return `${idx + 1}. *${item.description.replace(/\n/g, ' ')}*\n   Qty: ${item.qty}${(Number(item.days) || 1) > 1 ? ` | Hari: ${item.days}` : ''} | Harga: ${formatRupiah(item.price)} | Subtotal: *${formatRupiah(item.total)}*`;
+      return `${idx + 1}. *${item.description.replace(/\n/g, ' ')}*\n${itemSummaryText(item, formatRupiah)}`;
     }).join('\n');
 
     let bankText = "";

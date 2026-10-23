@@ -286,22 +286,19 @@ export function ContinuationHeader({ title, reference, party }: { title: string;
 // Items table (div grid so each row can be measured and paginated on its own)
 // ---------------------------------------------------------------------------
 
-const ITEM_COLUMNS = "34px 1fr 50px 118px 128px";
-const ITEM_COLUMNS_WITH_DAYS = "34px 1fr 44px 44px 112px 124px";
-
-/** The "Hari" column is shown only when at least one item spans more than one day. */
-export function itemsHaveDays(items: { days?: number }[]): boolean {
-  return items.some((item) => (Number(item.days) || 1) > 1);
-}
+const ITEM_COLUMNS = "30px 1fr 76px 112px 122px";
+const ITEM_COLUMNS_WITH_TIME = "30px 1fr 76px 70px 104px 114px";
 
 const cellBase: Style = { padding: "9px 10px", boxSizing: "border-box" };
+// Qty/time cells hold short "12 m" / "2 hari" texts; narrower padding keeps them on one line
+const unitCell: Style = { textAlign: "center", paddingLeft: 4, paddingRight: 4 };
 
-export function ItemsTableHeader({ showDays = false }: { showDays?: boolean }) {
+export function ItemsTableHeader({ showTime = false }: { showTime?: boolean }) {
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: showDays ? ITEM_COLUMNS_WITH_DAYS : ITEM_COLUMNS,
+        gridTemplateColumns: showTime ? ITEM_COLUMNS_WITH_TIME : ITEM_COLUMNS,
         background: COLORS.ink,
         color: COLORS.white,
         fontSize: 8.5,
@@ -314,7 +311,7 @@ export function ItemsTableHeader({ showDays = false }: { showDays?: boolean }) {
       <div style={{ ...cellBase, textAlign: "center" }}>No</div>
       <div style={cellBase}>Deskripsi Layanan / Item</div>
       <div style={{ ...cellBase, textAlign: "center" }}>Qty</div>
-      {showDays && <div style={{ ...cellBase, textAlign: "center" }}>Hari</div>}
+      {showTime && <div style={{ ...cellBase, textAlign: "center" }}>Waktu</div>}
       <div style={{ ...cellBase, textAlign: "right" }}>Harga Satuan</div>
       <div style={{ ...cellBase, textAlign: "right" }}>Jumlah</div>
     </div>
@@ -345,28 +342,38 @@ export function ItemDescription({ text }: { text: string }) {
   );
 }
 
+/**
+ * One line of the items table: a numbered item, or (without a number) one of
+ * its detail lines. Cells are pre-formatted strings; empty cells stay blank.
+ */
 export function ItemRow({
   index,
+  number,
   description,
   qty,
-  days,
+  time,
+  showTime,
   price,
   total,
+  isDetail = false,
 }: {
-  index: number;
+  index: number; // item index, for row shading
+  number?: number;
   description: string;
-  qty: number;
-  /** Pass only when the table shows the "Hari" column. */
-  days?: number;
+  qty: string;
+  time?: string;
+  showTime: boolean;
   price: string;
   total: string;
+  isDetail?: boolean;
 }) {
+  const detail: Style = isDetail ? { paddingTop: 5, paddingBottom: 5, color: COLORS.muted, fontWeight: 400 } : {};
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: days !== undefined ? ITEM_COLUMNS_WITH_DAYS : ITEM_COLUMNS,
-        fontSize: 10.5,
+        gridTemplateColumns: showTime ? ITEM_COLUMNS_WITH_TIME : ITEM_COLUMNS,
+        fontSize: isDetail ? 10 : 10.5,
         background: index % 2 === 1 ? COLORS.soft : COLORS.white,
         borderBottom: `1px solid ${COLORS.line}`,
         borderLeft: `1px solid ${COLORS.line}`,
@@ -374,14 +381,30 @@ export function ItemRow({
         wordBreak: "break-word",
       }}
     >
-      <div style={{ ...cellBase, textAlign: "center", color: COLORS.muted }}>{index + 1}</div>
-      <div style={cellBase}>
-        <ItemDescription text={description} />
-      </div>
-      <div style={{ ...cellBase, textAlign: "center", fontWeight: 600 }}>{qty}</div>
-      {days !== undefined && <div style={{ ...cellBase, textAlign: "center", fontWeight: 600 }}>{days}</div>}
-      <div style={{ ...cellBase, textAlign: "right", whiteSpace: "nowrap" }}>{price}</div>
-      <div style={{ ...cellBase, textAlign: "right", whiteSpace: "nowrap", fontWeight: 700, color: COLORS.ink }}>
+      <div style={{ ...cellBase, ...detail, textAlign: "center", color: COLORS.muted }}>{number ?? ""}</div>
+      {isDetail ? (
+        <div style={{ ...cellBase, ...detail, paddingLeft: 26, display: "flex", gap: 6 }}>
+          <span style={{ color: COLORS.accent, fontWeight: 700 }}>•</span>
+          <span>{description}</span>
+        </div>
+      ) : (
+        <div style={cellBase}>
+          <ItemDescription text={description} />
+        </div>
+      )}
+      <div style={{ ...cellBase, ...detail, ...unitCell, fontWeight: isDetail ? 400 : 600 }}>{qty}</div>
+      {showTime && <div style={{ ...cellBase, ...detail, ...unitCell, fontWeight: 600 }}>{time ?? ""}</div>}
+      <div style={{ ...cellBase, ...detail, textAlign: "right", whiteSpace: "nowrap" }}>{price}</div>
+      <div
+        style={{
+          ...cellBase,
+          ...detail,
+          textAlign: "right",
+          whiteSpace: "nowrap",
+          fontWeight: 700,
+          color: isDetail ? COLORS.text : COLORS.ink,
+        }}
+      >
         {total}
       </div>
     </div>

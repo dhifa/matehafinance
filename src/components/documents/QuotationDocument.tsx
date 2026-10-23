@@ -7,9 +7,7 @@ import {
   BankList,
   ContinuationHeader,
   DocumentFooter,
-  ItemRow,
   ItemsTableHeader,
-  itemsHaveDays,
   Letterhead,
   NumberedList,
   PartyGrid,
@@ -20,6 +18,8 @@ import {
   TwoColumnInfo,
 } from "./DocumentPrimitives";
 import PaginatedDocument, { FlowUnit } from "./PaginatedDocument";
+import { itemRowUnits } from "./itemRows";
+import { itemsHaveTime } from "../../utils/lineItems";
 
 export const QUOTATION_DEFAULT_TERMS = [
   "Harga sudah termasuk biaya instalasi dan operator teknisi selama acara.",
@@ -84,23 +84,10 @@ export default function QuotationDocument({
     </>
   );
 
-  const showDays = itemsHaveDays(quotation.items);
+  const showTime = itemsHaveTime(quotation.items);
 
   const units: FlowUnit[] = [
-    ...quotation.items.map((item, i) => ({
-      key: `row-${i}`,
-      kind: "row" as const,
-      node: (
-        <ItemRow
-          index={i}
-          description={item.description}
-          qty={item.qty}
-          days={showDays ? Number(item.days) || 1 : undefined}
-          price={formatRupiah(item.price)}
-          total={formatRupiah(item.total)}
-        />
-      ),
-    })),
+    ...itemRowUnits(quotation.items, showTime),
     {
       key: "totals",
       kind: "block",
@@ -174,7 +161,7 @@ export default function QuotationDocument({
       continuationHeader={
         <ContinuationHeader title="PENAWARAN HARGA" reference={quotation.quotationNumber} party={quotation.customerName} />
       }
-      tableHeader={<ItemsTableHeader showDays={showDays} />}
+      tableHeader={<ItemsTableHeader showTime={showTime} />}
       units={units}
       renderFooter={(page, total) => <DocumentFooter pageNumber={page} totalPages={total} reference={quotation.quotationNumber} />}
       layoutKey={JSON.stringify(quotation)}

@@ -11,6 +11,8 @@ import { resolveClientDetails } from "../utils/clientHelper";
 import { generateQuotationPdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
 import { notify } from "../utils/notification";
+import LineItemFields from "./LineItemFields";
+import { LineItemDraft, draftFromItem, emptyLineItem, formatQty, formatTime, mainAmount, newItemId, normalizeItem, subItemAmount, validateLineItem } from "../utils/lineItems";
 
 interface QuotationViewProps {
   onNotify?: (text: string, type?: "success" | "error" | "warning" | "info", title?: string) => void;
@@ -62,16 +64,11 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
   const [clientApprovalTitle, setClientApprovalTitle] = useState("");
 
   // New item draft input
-  const [newItem, setNewItem] = useState({ description: "", qty: 1, days: 1, price: 0 });
+  const [newItem, setNewItem] = useState<LineItemDraft>(emptyLineItem());
 
   // Individual item inline editing state
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
-  const [editItemDraft, setEditItemDraft] = useState<{ description: string; qty: number; days: number; price: number }>({
-    description: "",
-    qty: 1,
-    days: 1,
-    price: 0,
-  });
+  const [editItemDraft, setEditItemDraft] = useState<LineItemDraft>(emptyLineItem());
 
   useEffect(() => {
     const qQuo = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
@@ -114,51 +111,29 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
   };
 
   const addItem = () => {
-    if (!newItem.description.trim() || newItem.price <= 0) {
-      showNotification("Mohon isi deskripsi item dan harga satuan yang valid.", "warning", "Data Item Belum Lengkap");
+    const problem = validateLineItem(newItem);
+    if (problem) {
+      showNotification(problem, "warning", "Data Item Belum Lengkap");
       return;
     }
-    const item: QuotationItem = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
-      description: newItem.description.trim(),
-      qty: newItem.qty || 1,
-      days: newItem.days || 1,
-      price: newItem.price,
-      total: (newItem.qty || 1) * (newItem.days || 1) * newItem.price,
-    };
-    setItems([...items, item]);
-    setNewItem({ description: "", qty: 1, days: 1, price: 0 });
+    setItems([...items, normalizeItem(newItem, newItemId())]);
+    setNewItem(emptyLineItem());
   };
 
   const startEditItem = (index: number) => {
-    const itm = items[index];
     setEditingItemIndex(index);
-    setEditItemDraft({
-      description: itm.description,
-      qty: itm.qty,
-      days: itm.days || 1,
-      price: itm.price,
-    });
+    setEditItemDraft(draftFromItem(items[index]));
   };
 
   const saveEditedItem = () => {
     if (editingItemIndex === null) return;
-    if (!editItemDraft.description.trim() || editItemDraft.price <= 0) {
-      showNotification("Deskripsi dan harga tidak boleh kosong.", "warning", "Data Item Belum Lengkap");
+    const problem = validateLineItem(editItemDraft);
+    if (problem) {
+      showNotification(problem, "warning", "Data Item Belum Lengkap");
       return;
     }
     const updated = [...items];
-    const qty = editItemDraft.qty || 1;
-    const days = editItemDraft.days || 1;
-    const price = editItemDraft.price || 0;
-    updated[editingItemIndex] = {
-      ...updated[editingItemIndex],
-      description: editItemDraft.description.trim(),
-      qty,
-      days,
-      price,
-      total: qty * days * price,
-    };
+    updated[editingItemIndex] = normalizeItem(editItemDraft, updated[editingItemIndex].id);
     setItems(updated);
     setEditingItemIndex(null);
   };
@@ -177,18 +152,6 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
     updated[targetIdx] = temp;
     setItems(updated);
     if (editingItemIndex !== null) setEditingItemIndex(null);
-  };
-
-  const insertBulletPoint = (isDraft: boolean) => {
-    if (isDraft) {
-      const current = newItem.description;
-      const prefix = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
-      setNewItem({ ...newItem, description: current + prefix + "- " });
-    } else {
-      const current = editItemDraft.description;
-      const prefix = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
-      setEditItemDraft({ ...editItemDraft, description: current + prefix + "- " });
-    }
   };
 
   const generateQuotationNumber = () => {
@@ -218,18 +181,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
 
     // Auto-commit active inline item edit
     let currentItems = [...items];
-    if (editingItemIndex !== null && editItemDraft.description.trim() && editItemDraft.price > 0) {
-      const qty = editItemDraft.qty || 1;
-      const days = editItemDraft.days || 1;
-      const price = editItemDraft.price || 0;
-      currentItems[editingItemIndex] = {
-        ...currentItems[editingItemIndex],
-        description: editItemDraft.description.trim(),
-        qty,
-        days,
-        price,
-        total: qty * days * price,
-      };
+    if (editingItemIndex !== null && !validateLineItem(editItemDraft)) {
+      currentItems[editingItemIndex] = normalizeItem(editItemDraft, currentItems[editingItemIndex].id);
       setItems(currentItems);
       setEditingItemIndex(null);
     }
@@ -239,14 +192,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
       return;
     }
 
-    const sanitizedItems = currentItems.map((item, idx) => ({
-      id: item.id || `quo_item_${idx}_${Date.now()}`,
-      description: (item.description || "").trim(),
-      qty: Number(item.qty) || 1,
-      days: Number(item.days) || 1,
-      price: Number(item.price) || 0,
-      total: (Number(item.qty) || 1) * (Number(item.days) || 1) * (Number(item.price) || 0)
-    }));
+    const sanitizedItems = currentItems.map((item, idx) => normalizeItem(item, item.id || `quo_item_${idx}_${Date.now()}`));
 
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
     const grandTotal = sanitizedItems.reduce((sum, item) => sum + item.total, 0);
@@ -834,60 +780,18 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
           <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">Tambah Item Baru:</span>
-              <button
-                type="button"
-                onClick={() => insertBulletPoint(true)}
-                className="flex items-center space-x-1 text-[10px] text-slate-400 hover:text-cyan-300 transition bg-slate-950 px-2 py-1 rounded-md border border-slate-800 cursor-pointer"
-                title="Tambahkan baris poin (- )"
-              >
-                <ListPlus className="w-3 h-3" />
-                <span>+ Poin (-)</span>
-              </button>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-2.5 items-stretch md:items-start">
+            <div className="space-y-3">
               <textarea
-                placeholder="Deskripsi spesifikasi/alat (Bisa multi-baris, gunakan '-' untuk poin rincian)..."
-                className="flex-1 bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs text-white focus:border-cyan-500 focus:outline-none min-h-[68px]"
+                placeholder="Nama item / spesifikasi, mis. Sound System 7000 watt (rincian isi di Poin rincian)"
+                className="w-full bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs text-white focus:border-cyan-500 focus:outline-none min-h-[68px]"
                 value={newItem.description}
                 onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                 rows={2}
               />
-              <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
-                <div className="w-20">
-                  <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Qty</label>
-                  <input
-                    type="number"
-                    placeholder="Qty"
-                    min="1"
-                    className="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-white text-center focus:border-cyan-500 focus:outline-none font-semibold"
-                    value={newItem.qty || ""}
-                    onChange={(e) => setNewItem({ ...newItem, qty: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="w-20">
-                  <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Hari</label>
-                  <input
-                    type="number"
-                    placeholder="Hari"
-                    min="1"
-                    className="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-white text-center focus:border-cyan-500 focus:outline-none font-semibold"
-                    value={newItem.days || ""}
-                    onChange={(e) => setNewItem({ ...newItem, days: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="w-36">
-                  <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Harga Satuan (Rp)</label>
-                  <input
-                    type="number"
-                    placeholder="Harga"
-                    min="0"
-                    className="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-white focus:border-cyan-500 focus:outline-none font-mono"
-                    value={newItem.price || ""}
-                    onChange={(e) => setNewItem({ ...newItem, price: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="self-end pt-5">
+              <LineItemFields draft={newItem} onChange={setNewItem} accent="cyan" idPrefix="new-QuotationView" />
+              <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={addItem}
@@ -896,7 +800,6 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
                     <Plus className="w-4 h-4" />
                     <span>Tambah</span>
                   </button>
-                </div>
               </div>
             </div>
           </div>
@@ -919,14 +822,6 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-cyan-400">Edit Rincian Item #{idx + 1}</span>
-                        <button
-                          type="button"
-                          onClick={() => insertBulletPoint(false)}
-                          className="flex items-center space-x-1 text-[10px] text-slate-300 hover:text-cyan-300 transition bg-slate-950 px-2 py-0.5 rounded border border-slate-700 cursor-pointer"
-                        >
-                          <ListPlus className="w-3 h-3" />
-                          <span>+ Poin (-)</span>
-                        </button>
                       </div>
 
                       <div className="space-y-2">
@@ -939,41 +834,9 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
-                        <div>
-                          <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Qty:</label>
-                          <input
-                            type="number"
-                            min="1"
-                            className="w-full bg-slate-950 border border-slate-700 p-2 rounded-xl text-xs text-white text-center focus:border-cyan-400 focus:outline-none font-bold"
-                            value={editItemDraft.qty || ""}
-                            onChange={(e) => setEditItemDraft({ ...editItemDraft, qty: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
+                      <LineItemFields draft={editItemDraft} onChange={setEditItemDraft} accent="cyan" idPrefix="edit-QuotationView" />
 
-                        <div>
-                          <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Hari:</label>
-                          <input
-                            type="number"
-                            min="1"
-                            className="w-full bg-slate-950 border border-slate-700 p-2 rounded-xl text-xs text-white text-center focus:border-cyan-400 focus:outline-none font-bold"
-                            value={editItemDraft.days || ""}
-                            onChange={(e) => setEditItemDraft({ ...editItemDraft, days: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
-
-                        <div className="col-span-2 sm:col-span-1">
-                          <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Harga Satuan (Rp):</label>
-                          <input
-                            type="number"
-                            min="0"
-                            className="w-full bg-slate-950 border border-slate-700 p-2 rounded-xl text-xs text-white focus:border-cyan-400 focus:outline-none font-mono"
-                            value={editItemDraft.price || ""}
-                            onChange={(e) => setEditItemDraft({ ...editItemDraft, price: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
-
-                        <div className="col-span-2 sm:col-span-1 flex items-center justify-end gap-2 pt-1">
+                      <div className="flex items-center justify-end gap-2 pt-1">
                           <button
                             type="button"
                             onClick={cancelEditItem}
@@ -989,11 +852,6 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
                             <Check className="w-3.5 h-3.5" /> Simpan Item
                           </button>
                         </div>
-                      </div>
-
-                      <div className="text-right text-[11px] text-cyan-300 font-mono">
-                        Subtotal perkiraan: <strong>{formatRupiah((editItemDraft.qty || 1) * (editItemDraft.days || 1) * (editItemDraft.price || 0))}</strong>
-                      </div>
                     </div>
                   );
                 }
@@ -1012,8 +870,15 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
                           {item.description}
                         </div>
                         <div className="text-[11px] text-slate-400">
-                          Qty: <strong className="text-slate-300">{item.qty}</strong>{(item.days || 1) > 1 && <> × <strong className="text-slate-300">{item.days} hari</strong></>} @ <span className="font-mono">{formatRupiah(item.price)}</span>
+                          <strong className="text-slate-300">{formatQty(item.qty, item.unit)}</strong>{((item.days || 1) > 1 || item.timeUnit) && <> × <strong className="text-slate-300">{formatTime(item.days, item.timeUnit)}</strong></>} @ <span className="font-mono">{formatRupiah(item.price)}</span>
+                          {(item.subItems?.length ?? 0) > 0 && <span className="text-slate-500"> = {formatRupiah(mainAmount(item))}</span>}
                         </div>
+                        {(item.subItems || []).map((sub) => (
+                          <div key={sub.id} className="flex justify-between gap-3 pl-3 text-[11px] text-slate-400 border-l border-slate-700">
+                            <span>{sub.description} <span className="text-slate-500">({formatQty(sub.qty, sub.unit)})</span></span>
+                            {subItemAmount(sub) > 0 && <span className="font-mono text-amber-300 shrink-0">+ {formatRupiah(subItemAmount(sub))}</span>}
+                          </div>
+                        ))}
                       </div>
                     </div>
 

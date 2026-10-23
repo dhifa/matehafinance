@@ -7,9 +7,7 @@ import {
   BankList,
   ContinuationHeader,
   DocumentFooter,
-  ItemRow,
   ItemsTableHeader,
-  itemsHaveDays,
   Letterhead,
   NoticeBox,
   NumberedList,
@@ -22,6 +20,8 @@ import {
   TwoColumnInfo,
 } from "./DocumentPrimitives";
 import PaginatedDocument, { FlowUnit } from "./PaginatedDocument";
+import { itemRowUnits } from "./itemRows";
+import { itemsHaveTime } from "../../utils/lineItems";
 
 export const INVOICE_DEFAULT_TERMS = ["Bukti transfer mohon dikirimkan ke admin untuk verifikasi pembayaran."];
 
@@ -96,23 +96,10 @@ export default function InvoiceDocument({
 
   const terms = [...INVOICE_DEFAULT_TERMS, ...(invoice.termsAndConditions ? [invoice.termsAndConditions] : [])];
 
-  const showDays = itemsHaveDays(invoice.items);
+  const showTime = itemsHaveTime(invoice.items);
 
   const units: FlowUnit[] = [
-    ...invoice.items.map((item, i) => ({
-      key: `row-${i}`,
-      kind: "row" as const,
-      node: (
-        <ItemRow
-          index={i}
-          description={item.description}
-          qty={item.qty}
-          days={showDays ? Number(item.days) || 1 : undefined}
-          price={formatRupiah(item.price)}
-          total={formatRupiah(item.total)}
-        />
-      ),
-    })),
+    ...itemRowUnits(invoice.items, showTime),
     {
       key: "totals",
       kind: "block",
@@ -179,7 +166,7 @@ export default function InvoiceDocument({
     <PaginatedDocument
       firstHeader={firstHeader}
       continuationHeader={<ContinuationHeader title="INVOICE" reference={invoice.invoiceNumber} party={invoice.customerName} />}
-      tableHeader={<ItemsTableHeader showDays={showDays} />}
+      tableHeader={<ItemsTableHeader showTime={showTime} />}
       units={units}
       renderFooter={(page, total) => <DocumentFooter pageNumber={page} totalPages={total} reference={invoice.invoiceNumber} />}
       layoutKey={JSON.stringify(invoice)}
