@@ -68,21 +68,28 @@ nonaktifkan, hapus) atau minta AI "lupakan aturan …".
 
 Endpoint: `POST /api/ai/assistant`, `GET/POST /api/ai/memories`, `PATCH/DELETE /api/ai/memories/{id}`.
 
-## Pindah data dari Firestore
+## Pindah data dari Firestore (import JSON)
 
-1. **Sebelum** beralih, buka aplikasi versi lama (Firebase) sebagai admin → *Dashboard & Data* →
-   **Download Full Database (.JSON)**.
-2. Jalankan:
+1. Di aplikasi versi Firestore (finance.mateha.co.id), login sebagai admin → *Dashboard & Data* →
+   **Download Full Database (.JSON)**. File ini berisi semua data: event, Keuangan Mateha (kas), invoice,
+   quotation, kwitansi, klien, bank, payslip, kasbon, slip gaji yang dibagikan, pengguna, dan pengaturan.
+2. Di versi CI4, login sebagai admin → *Dashboard & Data* → kartu **Import & Export Database (MySQL)** →
+   **Pilih file JSON** → **Import ke MySQL**.
+   - Data yang sudah ada dilewati; centang **Timpa data yang sudah ada** untuk menimpanya.
+   - Password anggota di backup langsung di-*hash*, jadi staf bisa login dengan password yang sama.
+   - Hasil impor per koleksi ditampilkan, termasuk akun tanpa password.
+3. Untuk file yang sangat besar (gagal diunggah lewat browser), pakai perintah:
 
    ```bash
-   php spark mateha:import-backup /lokasi/mateha_full_backup_YYYY-MM-DD.json
+   php spark mateha:import-backup /lokasi/mateha_full_backup_YYYY-MM-DD.json [--overwrite]
    ```
 
-   - Data yang sudah ada dilewati; tambahkan `--overwrite` untuk menimpanya.
-   - Password anggota yang tersimpan di backup langsung di-*hash*, jadi staf bisa login dengan password yang sama.
-   - Akun tanpa password akan dilaporkan; atur dengan `php spark mateha:create-user <username>`.
-   - Backup versi lama **tidak berisi data Keuangan Mateha** (`settings/mateha_finance`). Versi baru sudah
-     menyertakannya di file backup.
+## Export database (.sql)
+
+*Dashboard & Data* → **Import & Export Database (MySQL)** → **Download Database (.SQL)** menghasilkan file
+`mateha_database_YYYY-MM-DD.sql` berisi struktur dan isi semua tabel. File ini bisa di-import lewat phpMyAdmin
+(*Import*) atau `mysql nama_database < mateha_database_YYYY-MM-DD.sql`. Tabel `auth_tokens` (sesi login) dan
+`app_secrets` (API key Gemini) sengaja tidak ikut; setelah restore, login ulang dan isi API key dari dashboard.
 
 ## Deploy ke hosting
 

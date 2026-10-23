@@ -16,6 +16,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => ['cors'
     $routes->put('admin/settings/ai', 'AdminSettings::saveAi');
     $routes->delete('admin/settings/ai', 'AdminSettings::deleteAi');
     $routes->post('admin/settings/ai/test', 'AdminSettings::testAi');
+    $routes->post('admin/import-json', 'AdminData::importJson');
+    $routes->get('admin/export-sql', 'AdminData::exportSql');
 
     $routes->post('gemini/parse-rab', 'Gemini::parseRab');
     $routes->post('gemini/parse-receipt', 'Gemini::parseReceipt');

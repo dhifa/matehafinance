@@ -82,3 +82,20 @@ export async function apiFetch<T = any>(path: string, init: { method?: string; b
 
   return payload as T;
 }
+
+/** Downloads a file from the API (e.g. the SQL export) with the user's token. */
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string }> {
+  const token = getToken();
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new ApiError(0, "unavailable", "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.");
+  }
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new ApiError(res.status, payload?.code || "internal", payload?.error || `Unduhan gagal (${res.status})`);
+  }
+  const match = /filename="?([^";]+)"?/i.exec(res.headers.get("Content-Disposition") || "");
+  return { blob: await res.blob(), filename: match?.[1] || "download" };
+}

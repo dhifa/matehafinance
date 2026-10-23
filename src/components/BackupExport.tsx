@@ -26,7 +26,8 @@ export default function BackupExport() {
         "clients",
         "kwitansi",
         "invoices",
-        "kasbon_requests"
+        "kasbon_requests",
+        "shared-payslips"
       ];
 
       const exportedData: Record<string, any[]> = {};
@@ -48,24 +49,30 @@ export default function BackupExport() {
         }
       }
 
-      // Also export system settings (custom roles, staff presets, etc.)
-      const settingsDocs = ["staff_presets", "custom_roles", "mateha_finance"];
+      // All settings documents: Keuangan Mateha (kas: mateha_finance), custom roles, staff presets, ...
       const exportedSettings: Record<string, any> = {};
-      for (const sDoc of settingsDocs) {
-        try {
-          const sSnap = await getDoc(doc(db, "settings", sDoc));
-          if (sSnap.exists()) {
-            exportedSettings[sDoc] = sSnap.data();
+      try {
+        const settingsSnap = await getDocs(collection(db, "settings"));
+        settingsSnap.forEach((sSnap) => {
+          exportedSettings[sSnap.id] = sSnap.data();
+        });
+      } catch (err) {
+        console.warn("Could not list settings, falling back to known documents:", err);
+        for (const sDoc of ["mateha_finance", "staff_presets", "custom_roles"]) {
+          try {
+            const sSnap = await getDoc(doc(db, "settings", sDoc));
+            if (sSnap.exists()) exportedSettings[sDoc] = sSnap.data();
+          } catch (e) {
+            console.warn(`Could not export settings/${sDoc}:`, e);
           }
-        } catch (err) {
-          console.warn(`Could not export settings/${sDoc}:`, err);
         }
       }
+      stats["settings"] = Object.keys(exportedSettings).length;
 
       const backupObj = {
         exportDate: new Date().toISOString(),
         appName: "Mateha Production System",
-        version: "2.5",
+        version: "2.6",
         summary: stats,
         settings: exportedSettings,
         collections: exportedData
@@ -99,7 +106,7 @@ export default function BackupExport() {
             <span>Backup & Export Database Keseluruhan (Full Data)</span>
           </h2>
           <p className="text-[11px] text-slate-400 mt-1 max-w-xl leading-relaxed">
-            Mengekspor seluruh database website Mateha ke dalam 1 file JSON lengkap: <strong>Proyek/Event, Klien, Rekening Bank, Invoice, Quotation, Kwitansi, Payslip Staff, Kasbon, dan Master Pengguna/Peran</strong>.
+            Mengekspor seluruh database website Mateha ke dalam 1 file JSON lengkap: <strong>Proyek/Event, Keuangan Mateha (kas), Klien, Rekening Bank, Invoice, Quotation, Kwitansi, Payslip Staff, Slip Gaji yang Dibagikan, Kasbon, serta Pengguna, Peran &amp; Pengaturan</strong>.
           </p>
         </div>
 

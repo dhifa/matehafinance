@@ -70,6 +70,7 @@ import {
 } from "lucide-react";
 import UserManagement from "./components/UserManagement";
 import BackupExport from "./components/BackupExport";
+import DatabaseTools from "./components/DatabaseTools";
 import AiSettingsCard from "./components/AiSettingsCard";
 import AiAssistant, { AiEventDraft } from "./components/AiAssistant";
 import StaffPayslipView from "./components/StaffPayslipView";
@@ -1717,6 +1718,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
             {!!userProfile && <FinancialChart projects={projects} />}
             {!!userProfile && userProfile.role === "admin" && <AiSettingsCard />}
             {!!userProfile && userProfile.role === "admin" && <BackupExport />}
+            {!!userProfile && userProfile.role === "admin" && <DatabaseTools />}
             
             {/* OVERVIEW TABLE FOR ALL REGISTERED PROJECTS */}
             <div className="bg-slate-900/40 backdrop-blur-sm border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
