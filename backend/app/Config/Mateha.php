@@ -53,6 +53,9 @@ class Mateha extends BaseConfig
     /** Faster models first for the chat assistant (short text extraction); overridable with `mateha.geminiChatModels`. */
     public string $geminiChatModels = 'gemini-flash-lite-latest,gemini-flash-latest,gemini-3.1-flash-lite';
 
+    /** Chat messages with images/PDFs: reading documents needs the stronger model first; `mateha.geminiVisionModels`. */
+    public string $geminiVisionModels = 'gemini-flash-latest,gemini-flash-lite-latest,gemini-3.1-flash-lite';
+
     public string $geminiApiKey = '';
 
     public function __construct()

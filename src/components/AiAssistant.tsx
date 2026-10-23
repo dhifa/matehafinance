@@ -83,6 +83,15 @@ const EXAMPLES = [
   "ini invoice event AHM Inter, buatkan RAB eventnya ya (lampirkan gambar invoice dengan tombol 📎)",
 ];
 
+/** Must match the server's selectable models; the server falls back to others if one fails */
+const MODEL_OPTIONS = [
+  { value: "", label: "Otomatis", hint: "Cepat untuk chat, lebih teliti untuk lampiran" },
+  { value: "gemini-flash-latest", label: "Gemini Flash", hint: "Teliti, cocok untuk membaca gambar/PDF" },
+  { value: "gemini-flash-lite-latest", label: "Gemini Flash Lite", hint: "Paling cepat, untuk chat singkat" },
+  { value: "gemini-3.1-pro-preview", label: "Gemini Pro", hint: "Paling teliti, tapi lambat" },
+];
+const MODEL_KEY = "mateha_ai_model";
+
 const eventSum = (rows: AiDraftItem[]) => rows.reduce((s, r) => s + r.qty * r.expense, 0);
 const docSum = (rows: AiDocItem[]) => rows.reduce((s, r) => s + lineItemTotal(r), 0);
 
@@ -123,6 +132,25 @@ export default function AiAssistant({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [attaching, setAttaching] = useState(false);
+  // Files from earlier in this conversation, re-sent with follow-up messages so the
+  // AI can still read them while the draft is corrected (kept in memory only)
+  const [contextFiles, setContextFiles] = useState<ChatAttachment[]>([]);
+  const [model, setModel] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(MODEL_KEY) || "";
+      return MODEL_OPTIONS.some((o) => o.value === saved) ? saved : "";
+    } catch {
+      return "";
+    }
+  });
+  const chooseModel = (value: string) => {
+    setModel(value);
+    try {
+      localStorage.setItem(MODEL_KEY, value);
+    } catch {
+      // Storage unavailable: the choice lasts until reload
+    }
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<"chat" | "create" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -165,6 +193,7 @@ export default function AiAssistant({
 
   const send = async (text: string) => {
     const files = attachments;
+    const sentFiles = files.length ? files : contextFiles;
     const content = text.trim() || (files.length ? "Tolong baca lampiran ini." : "");
     if (!content || busy || attaching) return;
     const next: ChatMessage[] = [
@@ -185,9 +214,11 @@ export default function AiAssistant({
             text: names?.length ? `${text}\n[lampiran: ${names.join(", ")}]` : text,
           })),
           draft,
-          attachments: files.map(({ mimeType, data }) => ({ mimeType, data })),
+          model,
+          attachments: sentFiles.map(({ mimeType, data }) => ({ mimeType, data })),
         },
       });
+      if (files.length) setContextFiles(files);
       setMessages([
         ...next,
         {
@@ -223,6 +254,7 @@ export default function AiAssistant({
   const reset = () => {
     setMessages([]);
     setAttachments([]);
+    setContextFiles([]);
     setDraft(null);
     setMissing([]);
     setError(null);
@@ -254,6 +286,7 @@ export default function AiAssistant({
       setMessages((prev) => [...prev, { role: "assistant", text: `✅ ${note}` }]);
       setDraft(null);
       setMissing([]);
+      setContextFiles([]);
       onDocumentCreated(tab, note);
     } catch (err: any) {
       setError(err?.message || "Gagal membuat dokumen.");
@@ -408,6 +441,22 @@ export default function AiAssistant({
             }}
             className="px-4 sm:px-6 pb-4 pt-1 space-y-2"
           >
+            {attachments.length === 0 && contextFiles.length > 0 && (
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">
+                  AI masih membaca lampiran sebelumnya: {contextFiles.map((f) => f.name).join(", ")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setContextFiles([])}
+                  className="shrink-0 text-slate-500 hover:text-white cursor-pointer"
+                  aria-label="Berhenti memakai lampiran sebelumnya"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             {(attachments.length > 0 || attaching) && (
               <div className="flex flex-wrap gap-2">
                 {attachments.map((a, i) => (
@@ -494,6 +543,23 @@ export default function AiAssistant({
                 {busy === "chat" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
             </div>
+            <label className="flex items-center gap-2 text-[11px] text-slate-400">
+              <Sparkles className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+              <span className="shrink-0">Model AI</span>
+              <select
+                value={model}
+                onChange={(e) => chooseModel(e.target.value)}
+                disabled={busy !== null}
+                className="bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none cursor-pointer"
+              >
+                {MODEL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <span className="truncate text-slate-500">{MODEL_OPTIONS.find((o) => o.value === model)?.hint}</span>
+            </label>
           </form>
         </div>
 

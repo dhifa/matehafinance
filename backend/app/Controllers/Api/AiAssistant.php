@@ -23,6 +23,8 @@ class AiAssistant extends BaseApiController
     private const EVENT_SECTIONS = ['income', 'accommodation', 'feeDistribution'];
     private const ATTACHMENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
     private const MAX_ATTACHMENTS  = 3;
+    /** Models the admin can pick in the chat card ("" = automatic) */
+    public const SELECTABLE_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.1-pro-preview'];
     private const RULE_HINT        = '/ke ?depan|mulai (sekarang|hari ini)|selalu|setiap|tiap kali|jangan|ingat|aturan|lupakan|hapus|ganti|default|biasanya|kalau|jika|apabila|harus|wajib/i';
     private const MAX_ATTACHMENT_CHARS = 6_000_000; // base64, ~4.5 MB per file
     private const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
@@ -65,7 +67,7 @@ class AiAssistant extends BaseApiController
         - paymentFor: keterangan pembayaran (mis. "Pelunasan Live Streaming - Bagimu Negeri").
         - paymentMethod: "Tunai / Cash", "Transfer Bank", atau sesuai yang disebut admin.
 
-        LAMPIRAN (gambar/PDF pada pesan terakhir):
+        LAMPIRAN (gambar/PDF yang dikirim admin di percakapan ini):
         - Baca lampiran dengan teliti (mis. invoice/quotation Mateha, RAB, daftar kebutuhan alat/kru, rundown): nama klien, nama event, tanggal, lokasi, item, qty, satuan, waktu, dan harga. Angka "1.500.000" = 1500000.
         - Ikuti keterangan admin tentang apa yang harus dibuat dari lampiran. Contoh "ini invoice event AHM Inter, buatkan RAB eventnya" => type "event": name/dates/location dari keterangan admin atau dari lampiran; setiap layanan yang ditagihkan di invoice menjadi income (A. Pemasukan) dengan harga dari invoice (qty income = qty × waktu bila ada, expense = harga satuan; jika item hanya punya total, qty 1 dan expense = total). Poin rincian alat tanpa harga tidak menjadi income.
         - Kebutuhan alat sewa, transport, konsumsi, atau operasional yang terlihat di lampiran atau disebut admin menjadi accommodation; kru/operator menjadi feeDistribution. Harga untuk keduanya HANYA dari admin, ATURAN YANG DIINGAT, atau KATALOG HARGA; jika tidak ada isi 0 dan sebutkan di missing.
@@ -118,7 +120,7 @@ class AiAssistant extends BaseApiController
                 return $this->fail(400, 'invalid-argument', $attachments);
             }
             if ($attachments !== []) {
-                $context .= "\n\nLAMPIRAN pada pesan terakhir: " . count($attachments) . ' file (terlampir setelah teks ini).';
+                $context .= "\n\nLAMPIRAN dari admin di percakapan ini: " . count($attachments) . ' file (terlampir setelah teks ini).';
             }
 
             // Reading images/PDFs takes the model longer than plain text
@@ -127,7 +129,7 @@ class AiAssistant extends BaseApiController
                 self::INSTRUCTION,
                 self::schema(),
                 $attachments === [] ? 45 : 75,
-                config(Mateha::class)->geminiChatModels
+                self::modelChain((string) ($body['model'] ?? ''), $attachments === [] ? config(Mateha::class)->geminiChatModels : config(Mateha::class)->geminiVisionModels)
             );
         } catch (RuntimeException $e) {
             return $this->fail(502, 'ai-error', $e->getMessage());
@@ -142,7 +144,16 @@ class AiAssistant extends BaseApiController
 
         $outDraft = null;
         if ($type !== 'none') {
-            $outDraft = ['type' => $type] + self::cleanDraft($type, is_array($result[$type] ?? null) ? $result[$type] : []);
+            $raw = is_array($result[$type] ?? null) ? $result[$type] : [];
+            if ($type === $draftType && $draft !== null) {
+                // Editing the same draft: fields the model left empty keep their current value
+                foreach ($draft as $key => $value) {
+                    if (! isset($raw[$key]) || $raw[$key] === '' || $raw[$key] === []) {
+                        $raw[$key] = $value;
+                    }
+                }
+            }
+            $outDraft = ['type' => $type] + self::cleanDraft($type, $raw);
         } elseif ($draft !== null) {
             // Rule-only or chit-chat message: keep the draft being edited
             $type     = $draftType;
@@ -160,6 +171,19 @@ class AiAssistant extends BaseApiController
             'memoriesForgotten' => $forgotten,
             'memoryError'       => $memoryError,
         ]);
+    }
+
+    /**
+     * The chosen model first, then the default chain as fallback.
+     */
+    private static function modelChain(string $chosen, string $defaults): string
+    {
+        if (! in_array($chosen, self::SELECTABLE_MODELS, true)) {
+            return $defaults;
+        }
+        $rest = array_filter(array_map('trim', explode(',', $defaults)), static fn ($m) => $m !== '' && $m !== $chosen);
+
+        return implode(',', [$chosen, ...$rest]);
     }
 
     /**
@@ -406,9 +430,19 @@ class AiAssistant extends BaseApiController
                         'accommodation'   => ['type' => 'ARRAY', 'items' => $budgetItem],
                         'feeDistribution' => ['type' => 'ARRAY', 'items' => $budgetItem],
                     ],
+                    // Required so the model writes the full draft instead of only describing it in "reply"
+                    'required' => ['name', 'location', 'dates', 'income', 'accommodation', 'feeDistribution'],
                 ],
-                'invoice'   => ['type' => 'OBJECT', 'properties' => $customer + ['dueDate' => ['type' => 'STRING'], 'isDp' => ['type' => 'BOOLEAN'], 'dpPercent' => ['type' => 'INTEGER']]],
-                'quotation' => ['type' => 'OBJECT', 'properties' => $customer + ['validUntil' => ['type' => 'STRING']]],
+                'invoice' => [
+                    'type'       => 'OBJECT',
+                    'properties' => $customer + ['dueDate' => ['type' => 'STRING'], 'isDp' => ['type' => 'BOOLEAN'], 'dpPercent' => ['type' => 'INTEGER']],
+                    'required'   => ['customerName', 'subject', 'date', 'items', 'isDp'],
+                ],
+                'quotation' => [
+                    'type'       => 'OBJECT',
+                    'properties' => $customer + ['validUntil' => ['type' => 'STRING']],
+                    'required'   => ['customerName', 'subject', 'date', 'items', 'validUntil'],
+                ],
                 'kwitansi'  => [
                     'type'       => 'OBJECT',
                     'properties' => [
@@ -419,6 +453,7 @@ class AiAssistant extends BaseApiController
                         'paymentMethod' => ['type' => 'STRING'],
                         'invoiceNumber' => ['type' => 'STRING'],
                     ],
+                    'required' => ['customerName', 'amount', 'paymentFor', 'date', 'paymentMethod'],
                 ],
             ],
             'required' => ['type', 'reply'],
