@@ -55,6 +55,8 @@ kwitansi**, contohnya:
 - "tgl 23 oktober ada event Bagimu Negeri di Mercure Lengkong, 3 kamera streaming dan 1 VJ, matador 2"
 - "buatkan invoice DP 50% untuk event Bagimu Negeri"
 - "buat kwitansi pelunasan untuk invoice INV/MATEHA/2026/10/002"
+- 📎 lampirkan foto/screenshot/PDF invoice lalu tulis "ini invoice event AHM Inter, buatkan RAB eventnya"
+  (maks. 3 file per pesan; gambar otomatis diperkecil di browser)
 
 AI memakai data yang ada (klien, event, invoice, riwayat harga). Draf bisa dikoreksi lewat chat, lalu klik
 **Buat …**; dokumen dibuat dengan penomoran & default yang sama seperti form manual. Tidak ada yang tersimpan
