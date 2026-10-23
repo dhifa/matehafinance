@@ -9,6 +9,7 @@ import {
   DocumentFooter,
   ItemRow,
   ItemsTableHeader,
+  itemsHaveDays,
   Letterhead,
   NumberedList,
   PartyGrid,
@@ -83,6 +84,8 @@ export default function QuotationDocument({
     </>
   );
 
+  const showDays = itemsHaveDays(quotation.items);
+
   const units: FlowUnit[] = [
     ...quotation.items.map((item, i) => ({
       key: `row-${i}`,
@@ -92,6 +95,7 @@ export default function QuotationDocument({
           index={i}
           description={item.description}
           qty={item.qty}
+          days={showDays ? Number(item.days) || 1 : undefined}
           price={formatRupiah(item.price)}
           total={formatRupiah(item.total)}
         />
@@ -170,7 +174,7 @@ export default function QuotationDocument({
       continuationHeader={
         <ContinuationHeader title="PENAWARAN HARGA" reference={quotation.quotationNumber} party={quotation.customerName} />
       }
-      tableHeader={<ItemsTableHeader />}
+      tableHeader={<ItemsTableHeader showDays={showDays} />}
       units={units}
       renderFooter={(page, total) => <DocumentFooter pageNumber={page} totalPages={total} reference={quotation.quotationNumber} />}
       layoutKey={JSON.stringify(quotation)}

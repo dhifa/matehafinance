@@ -47,6 +47,7 @@ export interface QuotationItem {
   description: string;
   qty: number;
   price: number;
+  days?: number; // number of days; total = qty × days × price (missing = 1 day)
   total: number;
 }
 
@@ -77,6 +78,7 @@ export interface InvoiceItem {
   description: string;
   qty: number;
   price: number;
+  days?: number; // number of days; total = qty × days × price (missing = 1 day)
   total: number;
 }
 

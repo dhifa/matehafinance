@@ -77,7 +77,7 @@ const EXAMPLES = [
 ];
 
 const eventSum = (rows: AiDraftItem[]) => rows.reduce((s, r) => s + r.qty * r.expense, 0);
-const docSum = (rows: AiDocItem[]) => rows.reduce((s, r) => s + r.qty * r.price, 0);
+const docSum = (rows: AiDocItem[]) => rows.reduce((s, r) => s + r.qty * (r.days || 1) * r.price, 0);
 
 function canCreate(d: Draft): boolean {
   if (d.type === "event") return !!d.name.trim();
@@ -495,7 +495,7 @@ function ItemList({
   title: string;
   tone: string;
   total: number;
-  rows: { description: string; qty: number; price: number; note?: string }[];
+  rows: { description: string; qty: number; days?: number; price: number; note?: string }[];
 }) {
   return (
     <div>
@@ -509,11 +509,11 @@ function ItemList({
             <div className="min-w-0">
               <p className="text-slate-100 font-medium break-words whitespace-pre-line">{r.description}</p>
               <p className="text-slate-500 tabular-nums">
-                {r.qty} × {r.price > 0 ? formatRupiah(r.price) : <span className="text-amber-300">harga belum ada</span>}
+                {r.qty}{(r.days || 1) > 1 && ` × ${r.days} hari`} × {r.price > 0 ? formatRupiah(r.price) : <span className="text-amber-300">harga belum ada</span>}
                 {r.note ? ` · ${r.note}` : ""}
               </p>
             </div>
-            <span className="shrink-0 text-slate-200 tabular-nums">{formatRupiah(r.qty * r.price)}</span>
+            <span className="shrink-0 text-slate-200 tabular-nums">{formatRupiah(r.qty * (r.days || 1) * r.price)}</span>
           </div>
         ))}
       </div>

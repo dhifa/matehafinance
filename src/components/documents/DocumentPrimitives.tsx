@@ -287,15 +287,21 @@ export function ContinuationHeader({ title, reference, party }: { title: string;
 // ---------------------------------------------------------------------------
 
 const ITEM_COLUMNS = "34px 1fr 50px 118px 128px";
+const ITEM_COLUMNS_WITH_DAYS = "34px 1fr 44px 44px 112px 124px";
+
+/** The "Hari" column is shown only when at least one item spans more than one day. */
+export function itemsHaveDays(items: { days?: number }[]): boolean {
+  return items.some((item) => (Number(item.days) || 1) > 1);
+}
 
 const cellBase: Style = { padding: "9px 10px", boxSizing: "border-box" };
 
-export function ItemsTableHeader() {
+export function ItemsTableHeader({ showDays = false }: { showDays?: boolean }) {
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: ITEM_COLUMNS,
+        gridTemplateColumns: showDays ? ITEM_COLUMNS_WITH_DAYS : ITEM_COLUMNS,
         background: COLORS.ink,
         color: COLORS.white,
         fontSize: 8.5,
@@ -308,6 +314,7 @@ export function ItemsTableHeader() {
       <div style={{ ...cellBase, textAlign: "center" }}>No</div>
       <div style={cellBase}>Deskripsi Layanan / Item</div>
       <div style={{ ...cellBase, textAlign: "center" }}>Qty</div>
+      {showDays && <div style={{ ...cellBase, textAlign: "center" }}>Hari</div>}
       <div style={{ ...cellBase, textAlign: "right" }}>Harga Satuan</div>
       <div style={{ ...cellBase, textAlign: "right" }}>Jumlah</div>
     </div>
@@ -342,12 +349,15 @@ export function ItemRow({
   index,
   description,
   qty,
+  days,
   price,
   total,
 }: {
   index: number;
   description: string;
   qty: number;
+  /** Pass only when the table shows the "Hari" column. */
+  days?: number;
   price: string;
   total: string;
 }) {
@@ -355,7 +365,7 @@ export function ItemRow({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: ITEM_COLUMNS,
+        gridTemplateColumns: days !== undefined ? ITEM_COLUMNS_WITH_DAYS : ITEM_COLUMNS,
         fontSize: 10.5,
         background: index % 2 === 1 ? COLORS.soft : COLORS.white,
         borderBottom: `1px solid ${COLORS.line}`,
@@ -369,6 +379,7 @@ export function ItemRow({
         <ItemDescription text={description} />
       </div>
       <div style={{ ...cellBase, textAlign: "center", fontWeight: 600 }}>{qty}</div>
+      {days !== undefined && <div style={{ ...cellBase, textAlign: "center", fontWeight: 600 }}>{days}</div>}
       <div style={{ ...cellBase, textAlign: "right", whiteSpace: "nowrap" }}>{price}</div>
       <div style={{ ...cellBase, textAlign: "right", whiteSpace: "nowrap", fontWeight: 700, color: COLORS.ink }}>
         {total}

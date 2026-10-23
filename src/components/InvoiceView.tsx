@@ -69,13 +69,14 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
   const [dpAmountManual, setDpAmountManual] = useState<number>(0);
 
   // New item draft input
-  const [newItem, setNewItem] = useState({ description: "", qty: 1, price: 0 });
+  const [newItem, setNewItem] = useState({ description: "", qty: 1, days: 1, price: 0 });
 
   // Individual item inline editing state
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
-  const [editItemDraft, setEditItemDraft] = useState<{ description: string; qty: number; price: number }>({
+  const [editItemDraft, setEditItemDraft] = useState<{ description: string; qty: number; days: number; price: number }>({
     description: "",
     qty: 1,
+    days: 1,
     price: 0,
   });
 
@@ -129,11 +130,12 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
       id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
       description: newItem.description.trim(),
       qty: newItem.qty || 1,
+      days: newItem.days || 1,
       price: newItem.price,
-      total: (newItem.qty || 1) * newItem.price,
+      total: (newItem.qty || 1) * (newItem.days || 1) * newItem.price,
     };
     setItems([...items, item]);
-    setNewItem({ description: "", qty: 1, price: 0 });
+    setNewItem({ description: "", qty: 1, days: 1, price: 0 });
   };
 
   const startEditItem = (index: number) => {
@@ -142,6 +144,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     setEditItemDraft({
       description: itm.description,
       qty: itm.qty,
+      days: itm.days || 1,
       price: itm.price,
     });
   };
@@ -154,13 +157,15 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     }
     const updated = [...items];
     const qty = editItemDraft.qty || 1;
+    const days = editItemDraft.days || 1;
     const price = editItemDraft.price || 0;
     updated[editingItemIndex] = {
       ...updated[editingItemIndex],
       description: editItemDraft.description.trim(),
       qty,
+      days,
       price,
-      total: qty * price,
+      total: qty * days * price,
     };
     setItems(updated);
     setEditingItemIndex(null);
@@ -299,13 +304,15 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     let currentItems = [...items];
     if (editingItemIndex !== null && editItemDraft.description.trim() && editItemDraft.price > 0) {
       const qty = editItemDraft.qty || 1;
+      const days = editItemDraft.days || 1;
       const price = editItemDraft.price || 0;
       currentItems[editingItemIndex] = {
         ...currentItems[editingItemIndex],
         description: editItemDraft.description.trim(),
         qty,
+        days,
         price,
-        total: qty * price,
+        total: qty * days * price,
       };
       setItems(currentItems);
       setEditingItemIndex(null);
@@ -320,8 +327,9 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
       id: item.id || `item_${idx}_${Date.now()}`,
       description: (item.description || "").trim(),
       qty: Number(item.qty) || 1,
+      days: Number(item.days) || 1,
       price: Number(item.price) || 0,
-      total: (Number(item.qty) || 1) * (Number(item.price) || 0)
+      total: (Number(item.qty) || 1) * (Number(item.days) || 1) * (Number(item.price) || 0)
     }));
 
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
@@ -857,6 +865,17 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
                     onChange={(e) => setNewItem({ ...newItem, qty: parseInt(e.target.value) || 0 })}
                   />
                 </div>
+                <div className="w-20">
+                  <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Hari</label>
+                  <input
+                    type="number"
+                    placeholder="Hari"
+                    min="1"
+                    className="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-white text-center focus:border-blue-500 focus:outline-none font-semibold"
+                    value={newItem.days || ""}
+                    onChange={(e) => setNewItem({ ...newItem, days: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
                 <div className="w-36">
                   <label className="text-[10px] text-slate-400 font-semibold mb-1 block">Harga Satuan (Rp)</label>
                   <input
@@ -920,7 +939,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
                         <div>
                           <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Qty:</label>
                           <input
@@ -933,6 +952,17 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
                         </div>
 
                         <div>
+                          <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Hari:</label>
+                          <input
+                            type="number"
+                            min="1"
+                            className="w-full bg-slate-950 border border-slate-700 p-2 rounded-xl text-xs text-white text-center focus:border-blue-400 focus:outline-none font-bold"
+                            value={editItemDraft.days || ""}
+                            onChange={(e) => setEditItemDraft({ ...editItemDraft, days: parseInt(e.target.value) || 0 })}
+                          />
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
                           <label className="text-[11px] text-slate-400 font-semibold mb-1 block">Harga Satuan (Rp):</label>
                           <input
                             type="number"
@@ -943,7 +973,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
                           />
                         </div>
 
-                        <div className="flex items-center justify-end gap-2 pt-1">
+                        <div className="col-span-2 sm:col-span-1 flex items-center justify-end gap-2 pt-1">
                           <button
                             type="button"
                             onClick={cancelEditItem}
@@ -962,7 +992,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
                       </div>
 
                       <div className="text-right text-[11px] text-blue-300 font-mono">
-                        Subtotal perkiraan: <strong>{formatRupiah((editItemDraft.qty || 1) * (editItemDraft.price || 0))}</strong>
+                        Subtotal perkiraan: <strong>{formatRupiah((editItemDraft.qty || 1) * (editItemDraft.days || 1) * (editItemDraft.price || 0))}</strong>
                       </div>
                     </div>
                   );
@@ -982,7 +1012,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
                           {item.description}
                         </div>
                         <div className="text-[11px] text-slate-400">
-                          Qty: <strong className="text-slate-300">{item.qty}</strong> @ <span className="font-mono">{formatRupiah(item.price)}</span>
+                          Qty: <strong className="text-slate-300">{item.qty}</strong>{(item.days || 1) > 1 && <> × <strong className="text-slate-300">{item.days} hari</strong></>} @ <span className="font-mono">{formatRupiah(item.price)}</span>
                         </div>
                       </div>
                     </div>

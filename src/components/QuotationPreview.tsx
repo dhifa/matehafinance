@@ -48,7 +48,7 @@ export default function QuotationPreview({
 
   const copySummaryForWA = () => {
     let itemsText = quotation.items.map((item, idx) => {
-      return `${idx + 1}. *${item.description.replace(/\n/g, ' ')}*\n   Qty: ${item.qty} | Harga: ${formatRupiah(item.price)} | Subtotal: *${formatRupiah(item.total)}*`;
+      return `${idx + 1}. *${item.description.replace(/\n/g, ' ')}*\n   Qty: ${item.qty}${(Number(item.days) || 1) > 1 ? ` | Hari: ${item.days}` : ''} | Harga: ${formatRupiah(item.price)} | Subtotal: *${formatRupiah(item.total)}*`;
     }).join('\n');
 
     let bankText = "";

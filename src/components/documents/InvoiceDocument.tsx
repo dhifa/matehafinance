@@ -9,6 +9,7 @@ import {
   DocumentFooter,
   ItemRow,
   ItemsTableHeader,
+  itemsHaveDays,
   Letterhead,
   NoticeBox,
   NumberedList,
@@ -95,6 +96,8 @@ export default function InvoiceDocument({
 
   const terms = [...INVOICE_DEFAULT_TERMS, ...(invoice.termsAndConditions ? [invoice.termsAndConditions] : [])];
 
+  const showDays = itemsHaveDays(invoice.items);
+
   const units: FlowUnit[] = [
     ...invoice.items.map((item, i) => ({
       key: `row-${i}`,
@@ -104,6 +107,7 @@ export default function InvoiceDocument({
           index={i}
           description={item.description}
           qty={item.qty}
+          days={showDays ? Number(item.days) || 1 : undefined}
           price={formatRupiah(item.price)}
           total={formatRupiah(item.total)}
         />
@@ -175,7 +179,7 @@ export default function InvoiceDocument({
     <PaginatedDocument
       firstHeader={firstHeader}
       continuationHeader={<ContinuationHeader title="INVOICE" reference={invoice.invoiceNumber} party={invoice.customerName} />}
-      tableHeader={<ItemsTableHeader />}
+      tableHeader={<ItemsTableHeader showDays={showDays} />}
       units={units}
       renderFooter={(page, total) => <DocumentFooter pageNumber={page} totalPages={total} reference={invoice.invoiceNumber} />}
       layoutKey={JSON.stringify(invoice)}

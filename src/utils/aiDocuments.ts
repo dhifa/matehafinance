@@ -12,6 +12,7 @@ import { Bank, Invoice, Kwitansi, Quotation } from "../types";
 export interface AiDocItem {
   description: string;
   qty: number;
+  days?: number;
   price: number;
 }
 
@@ -75,8 +76,9 @@ function toItems(items: AiDocItem[]) {
     id: `item_${idx}_${Date.now()}`,
     description: item.description.trim(),
     qty: Number(item.qty) || 1,
+    days: Number(item.days) || 1,
     price: Number(item.price) || 0,
-    total: (Number(item.qty) || 1) * (Number(item.price) || 0),
+    total: (Number(item.qty) || 1) * (Number(item.days) || 1) * (Number(item.price) || 0),
   }));
 }
 
