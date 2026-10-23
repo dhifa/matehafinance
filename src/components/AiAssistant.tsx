@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Bot, Send, Loader2, Sparkles, CalendarDays, MapPin, AlertTriangle, CheckCircle2, RotateCcw, User,
-  Brain, Pin, Trash2, Undo2, Plus, Pencil, X, FileText, Receipt, FileSignature, Coins,
+  Brain, Pin, Trash2, Undo2, Plus, Pencil, X, FileText, Receipt, FileSignature, Coins, Paperclip,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { formatRupiah } from "../types";
 import { formatDateString, formatMultiDates } from "../utils/date";
 import { terbilang } from "../utils/numberToWords";
 import { formatQty, formatTime, lineItemTotal, subItemAmount } from "../utils/lineItems";
+import { ACCEPTED_TYPES, ChatAttachment, MAX_ATTACHMENTS, MAX_TOTAL_CHARS, prepareAttachment } from "../utils/chatAttachments";
 import {
   AiDocItem, AiInvoiceDraft, AiKwitansiDraft, AiQuotationDraft,
   createInvoiceFromDraft, createKwitansiFromDraft, createQuotationFromDraft,
@@ -44,6 +45,8 @@ interface Memory {
 interface ChatMessage {
   role: "user" | "assistant";
   text: string;
+  /** names of attached files (the files themselves are not kept) */
+  attachments?: string[];
   saved?: Memory[];
   forgotten?: Memory[];
 }
@@ -75,6 +78,7 @@ const EXAMPLES = [
   "tgl 23 oktober ada event Bagimu Negeri di Mercure Lengkong, kita memberikan service 3 kamera streaming dan 1 VJ, matador 2",
   "buatkan invoice DP 50% untuk event Bagimu Negeri",
   "kedepannya kalau ada live streaming, selalu tambahkan 1 operator zoom di fee kru",
+  "ini invoice event AHM Inter, buatkan RAB eventnya ya (lampirkan gambar invoice dengan tombol 📎)",
 ];
 
 const eventSum = (rows: AiDraftItem[]) => rows.reduce((s, r) => s + r.qty * r.expense, 0);
@@ -115,6 +119,9 @@ export default function AiAssistant({
   const [draft, setDraft] = useState<Draft | null>(restored?.draft || null);
   const [missing, setMissing] = useState<string[]>(restored?.missing || []);
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<"chat" | "create" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showMemory, setShowMemory] = useState(false);
@@ -132,18 +139,51 @@ export default function AiAssistant({
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, busy]);
 
+  const addFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setError(null);
+    setAttaching(true);
+    try {
+      const room = MAX_ATTACHMENTS - attachments.length;
+      if (room <= 0) throw new Error(`Maksimal ${MAX_ATTACHMENTS} lampiran per pesan.`);
+      const prepared = await Promise.all(files.slice(0, room).map(prepareAttachment));
+      const all = [...attachments, ...prepared];
+      if (all.reduce((n, a) => n + a.data.length, 0) > MAX_TOTAL_CHARS) {
+        throw new Error("Total lampiran terlalu besar. Kirim lebih sedikit file atau PDF yang lebih kecil.");
+      }
+      setAttachments(all);
+      if (files.length > room) setError(`Hanya ${MAX_ATTACHMENTS} lampiran pertama yang dipakai.`);
+    } catch (err: any) {
+      setError(err?.message || "Lampiran gagal diproses.");
+    } finally {
+      setAttaching(false);
+    }
+  };
+
   const send = async (text: string) => {
-    const content = text.trim();
-    if (!content || busy) return;
-    const next: ChatMessage[] = [...messages, { role: "user", text: content }];
+    const files = attachments;
+    const content = text.trim() || (files.length ? "Tolong baca lampiran ini." : "");
+    if (!content || busy || attaching) return;
+    const next: ChatMessage[] = [
+      ...messages,
+      { role: "user", text: content, ...(files.length ? { attachments: files.map((f) => f.name) } : {}) },
+    ];
     setMessages(next);
     setInput("");
+    setAttachments([]);
     setError(null);
     setBusy("chat");
     try {
       const res = await apiFetch<AssistantResponse>("/ai/assistant", {
         method: "POST",
-        body: { messages: next.map(({ role, text }) => ({ role, text })), draft },
+        body: {
+          messages: next.map(({ role, text, attachments: names }) => ({
+            role,
+            text: names?.length ? `${text}\n[lampiran: ${names.join(", ")}]` : text,
+          })),
+          draft,
+          attachments: files.map(({ mimeType, data }) => ({ mimeType, data })),
+        },
       });
       setMessages([
         ...next,
@@ -154,6 +194,7 @@ export default function AiAssistant({
       if (res.memoryError) setError(res.memoryError);
     } catch (err: any) {
       setError(err?.message || "Asisten AI gagal merespons.");
+      if (files.length) setAttachments(files); // let the user retry without re-attaching
     } finally {
       setBusy(null);
     }
@@ -172,6 +213,7 @@ export default function AiAssistant({
 
   const reset = () => {
     setMessages([]);
+    setAttachments([]);
     setDraft(null);
     setMissing([]);
     setError(null);
@@ -284,6 +326,15 @@ export default function AiAssistant({
                     }`}
                   >
                     {m.text}
+                    {(m.attachments || []).length > 0 && (
+                      <span className={`mt-1 flex flex-wrap gap-1 text-[11px] ${m.role === "user" ? "text-slate-900/80" : "text-slate-400"}`}>
+                        {m.attachments!.map((name, j) => (
+                          <span key={j} className="inline-flex items-center gap-1 rounded-md bg-black/10 px-1.5 py-0.5">
+                            <Paperclip className="w-3 h-3" /> {name}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </div>
                   {m.role === "user" && (
                     <div className="w-7 h-7 shrink-0 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
@@ -315,7 +366,7 @@ export default function AiAssistant({
             {busy === "chat" && (
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-                AI sedang berpikir...
+                {messages[messages.length - 1]?.attachments?.length ? "AI sedang membaca lampiran..." : "AI sedang berpikir..."}
               </div>
             )}
           </div>
@@ -332,29 +383,94 @@ export default function AiAssistant({
               e.preventDefault();
               send(input);
             }}
-            className="px-4 sm:px-6 pb-4 pt-1 flex items-end gap-2"
+            className="px-4 sm:px-6 pb-4 pt-1 space-y-2"
           >
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send(input);
+            {(attachments.length > 0 || attaching) && (
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((a, i) => (
+                  <div key={i} className="relative group">
+                    {a.preview ? (
+                      <img src={a.preview} alt={a.name} className="h-16 w-16 rounded-lg object-cover border border-slate-700" />
+                    ) : (
+                      <div className="h-16 w-16 rounded-lg border border-slate-700 bg-slate-800 flex flex-col items-center justify-center text-[10px] text-slate-300 px-1">
+                        <FileText className="w-5 h-5 text-rose-300" />
+                        <span className="truncate w-full text-center">{a.name}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setAttachments(attachments.filter((_, j) => j !== i))}
+                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-slate-900 border border-slate-600 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer"
+                      aria-label={`Hapus ${a.name}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {attaching && (
+                  <div className="h-16 w-16 rounded-lg border border-dashed border-slate-700 flex items-center justify-center">
+                    <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept={ACCEPTED_TYPES}
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(Array.from(e.target.files || []));
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={busy !== null || attaching || attachments.length >= MAX_ATTACHMENTS}
+                className="h-11 w-11 shrink-0 rounded-xl border border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer disabled:opacity-40"
+                aria-label="Lampirkan gambar atau PDF"
+                title="Lampirkan gambar/PDF (invoice, RAB, daftar kebutuhan)"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send(input);
+                  }
+                }}
+                onPaste={(e) => {
+                  const files = Array.from(e.clipboardData.files as FileList).filter((f: File) => f.type.startsWith("image/") || f.type === "application/pdf");
+                  if (files.length) {
+                    e.preventDefault();
+                    addFiles(files);
+                  }
+                }}
+                rows={2}
+                placeholder={
+                  attachments.length
+                    ? "Jelaskan lampirannya, mis. “ini invoice event AHM Inter, buatkan RAB eventnya”"
+                    : draft
+                      ? "Koreksi draf, mis. “harga VJ 1,5 juta”..."
+                      : "Ketik permintaan, atau lampirkan gambar invoice dengan 📎"
                 }
-              }}
-              rows={2}
-              placeholder={draft ? "Koreksi draf, mis. “harga VJ 1,5 juta”..." : "Ketik permintaan atau aturan kerja..."}
-              className="flex-1 resize-none bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || busy !== null}
-              className="h-11 w-11 shrink-0 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center justify-center cursor-pointer disabled:opacity-40"
-              aria-label="Kirim"
-            >
-              {busy === "chat" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
+                className="flex-1 resize-none bg-slate-950 border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={(!input.trim() && attachments.length === 0) || busy !== null || attaching}
+                className="h-11 w-11 shrink-0 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center justify-center cursor-pointer disabled:opacity-40"
+                aria-label="Kirim"
+              >
+                {busy === "chat" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            </div>
           </form>
         </div>
 

@@ -89,7 +89,7 @@ class GeminiClient
      */
     public static function imagePart(string $imageBase64, string $mimeType): array
     {
-        $mimeType = preg_match('#^image/[a-z0-9.+-]+$#i', $mimeType) ? $mimeType : 'image/jpeg';
+        $mimeType = preg_match('#^(image/[a-z0-9.+-]+|application/pdf)$#i', $mimeType) ? $mimeType : 'image/jpeg';
 
         return ['inlineData' => ['mimeType' => $mimeType, 'data' => preg_replace('#^data:[^;]+;base64,#', '', $imageBase64)]];
     }

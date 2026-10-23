@@ -21,6 +21,10 @@ class AiAssistant extends BaseApiController
 {
     private const TYPES          = ['event', 'invoice', 'quotation', 'kwitansi', 'none'];
     private const EVENT_SECTIONS = ['income', 'accommodation', 'feeDistribution'];
+    private const ATTACHMENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
+    private const MAX_ATTACHMENTS  = 3;
+    private const MAX_ATTACHMENT_CHARS = 6_000_000; // base64, ~4.5 MB per file
+    private const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
 
     private const INSTRUCTION = <<<'TXT'
         Kamu adalah asisten administrasi Mateha Production, perusahaan produksi event (live streaming, multimedia, dokumentasi) di Bandung.
@@ -59,6 +63,12 @@ class AiAssistant extends BaseApiController
         - Jika admin menyebut invoice dari DAFTAR INVOICE, isi invoiceNumber, customerName dari invoice itu, dan amount = total invoice (untuk invoice DP pakai nominal DP-nya kecuali admin menyebut lain).
         - paymentFor: keterangan pembayaran (mis. "Pelunasan Live Streaming - Bagimu Negeri").
         - paymentMethod: "Tunai / Cash", "Transfer Bank", atau sesuai yang disebut admin.
+
+        LAMPIRAN (gambar/PDF pada pesan terakhir):
+        - Baca lampiran dengan teliti (mis. invoice/quotation Mateha, RAB, daftar kebutuhan alat/kru, rundown): nama klien, nama event, tanggal, lokasi, item, qty, satuan, waktu, dan harga. Angka "1.500.000" = 1500000.
+        - Ikuti keterangan admin tentang apa yang harus dibuat dari lampiran. Contoh "ini invoice event AHM Inter, buatkan RAB eventnya" => type "event": name/dates/location dari keterangan admin atau dari lampiran; setiap layanan yang ditagihkan di invoice menjadi income (A. Pemasukan) dengan harga dari invoice (qty income = qty × waktu bila ada, expense = harga satuan; jika item hanya punya total, qty 1 dan expense = total). Poin rincian alat tanpa harga tidak menjadi income.
+        - Kebutuhan alat sewa, transport, konsumsi, atau operasional yang terlihat di lampiran atau disebut admin menjadi accommodation; kru/operator menjadi feeDistribution. Harga untuk keduanya HANYA dari admin, ATURAN YANG DIINGAT, atau KATALOG HARGA; jika tidak ada isi 0 dan sebutkan di missing.
+        - Jika lampiran tidak terbaca atau bukan dokumen yang relevan, katakan di reply dan jangan mengarang isinya.
 
         MEMORI & ATURAN KERJA:
         7. Selalu patuhi semua "ATURAN YANG DIINGAT". Aturan dari admin lebih diutamakan daripada kebiasaan di katalog.
@@ -102,7 +112,22 @@ class AiAssistant extends BaseApiController
                 . "DRAF SAAT INI:\n" . ($draft ? json_encode(['type' => $draftType] + $draft, JSON_UNESCAPED_UNICODE) : '(belum ada)') . "\n\n"
                 . "PERCAKAPAN:\n" . implode("\n", $transcript);
 
-            $result = GeminiClient::generateJson([['text' => $context]], self::INSTRUCTION, self::schema(), 45, config(Mateha::class)->geminiChatModels);
+            $attachments = self::attachmentParts($body['attachments'] ?? null);
+            if (is_string($attachments)) {
+                return $this->fail(400, 'invalid-argument', $attachments);
+            }
+            if ($attachments !== []) {
+                $context .= "\n\nLAMPIRAN pada pesan terakhir: " . count($attachments) . ' file (terlampir setelah teks ini).';
+            }
+
+            // Reading images/PDFs takes the model longer than plain text
+            $result = GeminiClient::generateJson(
+                [['text' => $context], ...$attachments],
+                self::INSTRUCTION,
+                self::schema(),
+                $attachments === [] ? 45 : 75,
+                config(Mateha::class)->geminiChatModels
+            );
         } catch (RuntimeException $e) {
             return $this->fail(502, 'ai-error', $e->getMessage());
         } catch (Throwable $e) {
@@ -134,6 +159,36 @@ class AiAssistant extends BaseApiController
             'memoriesForgotten' => $forgotten,
             'memoryError'       => $memoryError,
         ]);
+    }
+
+    /**
+     * Validates attached files and turns them into Gemini inline-data parts.
+     *
+     * @return list<array<string, mixed>>|string the parts, or an error message
+     */
+    private static function attachmentParts(mixed $raw): array|string
+    {
+        if (! is_array($raw) || $raw === []) {
+            return [];
+        }
+        if (count($raw) > self::MAX_ATTACHMENTS) {
+            return 'Maksimal ' . self::MAX_ATTACHMENTS . ' lampiran per pesan.';
+        }
+
+        $parts = [];
+        foreach ($raw as $file) {
+            $mime = strtolower((string) ($file['mimeType'] ?? ''));
+            $data = (string) ($file['data'] ?? '');
+            if (! in_array($mime, self::ATTACHMENT_TYPES, true)) {
+                return 'Lampiran harus berupa gambar (JPG/PNG) atau PDF.';
+            }
+            if ($data === '' || strlen($data) > self::MAX_ATTACHMENT_CHARS || strspn($data, self::BASE64_CHARS) !== strlen($data)) {
+                return 'Lampiran kosong, rusak, atau terlalu besar (maks. sekitar 4 MB per file).';
+            }
+            $parts[] = GeminiClient::imagePart($data, $mime);
+        }
+
+        return $parts;
     }
 
     /**
