@@ -47,12 +47,24 @@ GEMINI_API_KEY =    # opsional; lebih mudah diisi dari dashboard admin
 kartu **Pengaturan AI (Gemini)** → tempel key → *Tes Koneksi* → *Simpan Key*. Key dari dashboard dipakai lebih
 dulu; jika dikosongkan, sistem memakai `GEMINI_API_KEY` di `.env`.
 
-## Asisten AI (buat event dari chat)
+## Asisten AI
 
-Di *Dashboard & Data* (admin) ada kartu **Asisten AI · Buat Event dari Chat**. Ketik cerita event, misalnya
-"tgl 23 oktober ada event Bagimu Negeri di Mercure Lengkong, 3 kamera streaming dan 1 VJ, matador 2".
-AI menyusun draf (nama, tanggal, lokasi, item RAB) dengan harga dari riwayat event sebelumnya; koreksi lewat chat,
-lalu klik **Buat Event**. Event tidak dibuat sebelum dikonfirmasi. Endpoint: `POST /api/ai/event-draft`.
+Di *Dashboard & Data* ada kartu **Asisten AI**. Lewat chat, AI menyusun draf **event, invoice, quotation, atau
+kwitansi**, contohnya:
+
+- "tgl 23 oktober ada event Bagimu Negeri di Mercure Lengkong, 3 kamera streaming dan 1 VJ, matador 2"
+- "buatkan invoice DP 50% untuk event Bagimu Negeri"
+- "buat kwitansi pelunasan untuk invoice INV/MATEHA/2026/10/002"
+
+AI memakai data yang ada (klien, event, invoice, riwayat harga). Draf bisa dikoreksi lewat chat, lalu klik
+**Buat …**; dokumen dibuat dengan penomoran & default yang sama seperti form manual. Tidak ada yang tersimpan
+sebelum dikonfirmasi. Percakapan tersimpan di browser.
+
+**Memori AI**: aturan kerja yang diajarkan admin ("kedepannya kalau ada live streaming, selalu tambahkan 1 operator
+zoom") disimpan di tabel `ai_memories` dan selalu dipakai AI. Kelola lewat tombol **Memori AI** (tambah, edit,
+nonaktifkan, hapus) atau minta AI "lupakan aturan …".
+
+Endpoint: `POST /api/ai/assistant`, `GET/POST /api/ai/memories`, `PATCH/DELETE /api/ai/memories/{id}`.
 
 ## Pindah data dari Firestore
 

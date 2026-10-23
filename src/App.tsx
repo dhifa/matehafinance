@@ -71,7 +71,7 @@ import {
 import UserManagement from "./components/UserManagement";
 import BackupExport from "./components/BackupExport";
 import AiSettingsCard from "./components/AiSettingsCard";
-import AiEventAssistant, { AiEventDraft } from "./components/AiEventAssistant";
+import AiAssistant, { AiEventDraft } from "./components/AiAssistant";
 import StaffPayslipView from "./components/StaffPayslipView";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import NotificationModal, { PopupNotificationState } from "./components/NotificationModal";
@@ -1701,7 +1701,18 @@ _Sistem Keuangan Otomatis Mateha Production_`;
         {/* ==================== TAB VIEW 2: DASHBOARD & COMPARISON DATA ==================== */}
         {activeTab === "dashboard" && (
           <div className="space-y-6 text-left">
-            {!!userProfile && <AiEventAssistant onCreate={handleCreateProjectFromAi} />}
+            {!!userProfile && user && (
+              <AiAssistant
+                storageKey={user.uid}
+                isAdmin={(userProfile.role || "").toLowerCase() === "admin"}
+                onCreateEvent={handleCreateProjectFromAi}
+                onDocumentCreated={(tab, message) => {
+                  setActiveTab(tab);
+                  window.scrollTo({ top: 0 });
+                  triggerNotification(message);
+                }}
+              />
+            )}
             {!!userProfile && <DashboardStats projects={projects} />}
             {!!userProfile && <FinancialChart projects={projects} />}
             {!!userProfile && userProfile.role === "admin" && <AiSettingsCard />}

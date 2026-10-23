@@ -19,7 +19,12 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => ['cors'
 
     $routes->post('gemini/parse-rab', 'Gemini::parseRab');
     $routes->post('gemini/parse-receipt', 'Gemini::parseReceipt');
-    $routes->post('ai/event-draft', 'AiAssistant::eventDraft');
+    $routes->post('ai/assistant', 'AiAssistant::chat');
+    $routes->post('ai/event-draft', 'AiAssistant::chat'); // older clients
+    $routes->get('ai/memories', 'AiMemories::index');
+    $routes->post('ai/memories', 'AiMemories::create');
+    $routes->patch('ai/memories/(:num)', 'AiMemories::update/$1');
+    $routes->delete('ai/memories/(:num)', 'AiMemories::delete/$1');
 
     $routes->get('collections/(:segment)', 'Collections::index/$1');
     $routes->post('collections/(:segment)', 'Collections::create/$1');
