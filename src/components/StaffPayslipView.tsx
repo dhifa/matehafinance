@@ -2441,8 +2441,9 @@ export default function StaffPayslipView({
                   </label>
                   <input
                     type="number"
-                    min="1000"
-                    step="500"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
                     placeholder="e.g. 150000"
                     value={newReimburseExpense}
                     onChange={(e) => setNewReimburseExpense(e.target.value)}
