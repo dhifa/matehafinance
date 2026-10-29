@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { collection, onSnapshot, doc, setDoc, addDoc, query, where, updateDoc } from "../lib/firestore";
 import { db, sanitizeForFirestore } from "../utils/backend";
-import { EventProject, UserProfile, formatRupiah, PublishedPayslip, KasbonRequest, BudgetItem } from "../types";
+import { EventProject, UserProfile, formatRupiah, PublishedPayslip, KasbonRequest, BudgetItem, isSalaryRequest } from "../types";
 import { calculateProjectBudget } from "../utils/math";
 import { 
   FileText, 
@@ -253,8 +253,8 @@ export default function StaffPayslipView({
     return () => unsub();
   }, [isAdmin, currentUserProfile?.uid]);
 
-  // Filter kasbon requests strictly for current user (staff and admin each only see their own personal kasbon requests here)
-  const myKasbonRequests = useMemo(() => {
+  // Filter requests strictly for current user (staff and admin each only see their own personal requests here)
+  const myRequests = useMemo(() => {
     const curUid = currentUserProfile?.uid;
     const curUsername = (currentUserProfile?.username || "").toLowerCase().trim();
     return kasbonList.filter((k) => {
@@ -263,6 +263,16 @@ export default function StaffPayslipView({
       return matchUid || matchUsername;
     });
   }, [kasbonList, currentUserProfile]);
+
+  // Kasbon only: salary payout requests are not deductions and don't count toward the kasbon limit
+  const myKasbonRequests = useMemo(() => myRequests.filter((k) => !isSalaryRequest(k)), [myRequests]);
+
+  // Latest salary payout request for the selected period
+  const currentSalaryRequest = useMemo(() => {
+    return myRequests
+      .filter((k) => isSalaryRequest(k) && k.periodMonth === selectedMonth && k.periodYear === selectedYear)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0] || null;
+  }, [myRequests, selectedMonth, selectedYear]);
 
   // Helper date checker for projects in selected period
   const isProjInSelectedPeriod = (proj: EventProject) => {
@@ -583,6 +593,59 @@ export default function StaffPayslipView({
   }, [kasbonPlafondType, kasbonFixedLimit, kasbonPercentLimit, totalGrossTHP, feeOnlyEarnings, currentPeriodActiveKasbon]);
 
   // Handle staff submitting kasbon request with constraint check
+  const [submittingSalary, setSubmittingSalary] = useState(false);
+  const [salaryNote, setSalaryNote] = useState("");
+
+  // Staff asks admin to pay out the salary of a released (published) payslip
+  const handleRequestSalary = async () => {
+    if (!currentUserProfile?.uid) return;
+    if (!isPayslipPublished) {
+      onNotify("Pencairan gaji hanya bisa diajukan setelah slip gaji dirilis Admin.", "error");
+      return;
+    }
+    if (takeHomePay <= 0) {
+      onNotify("Take home pay periode ini Rp 0, tidak ada gaji yang bisa dicairkan.", "error");
+      return;
+    }
+    if (currentSalaryRequest && currentSalaryRequest.status !== "rejected") {
+      onNotify("Pencairan gaji periode ini sudah diajukan.", "info");
+      return;
+    }
+    const finalBankName = kasbonBankName === "Lainnya / Bank Lain" ? kasbonCustomBank.trim() : kasbonBankName;
+    if (!finalBankName || !kasbonAccountNumber.trim() || !kasbonAccountHolder.trim()) {
+      onNotify("Lengkapi Bank / E-Wallet, nomor rekening, dan nama pemilik rekening tujuan pencairan.", "error");
+      return;
+    }
+
+    setSubmittingSalary(true);
+    try {
+      const period = `${INDONESIAN_MONTH_NAMES[selectedMonth]} ${selectedYear}`;
+      const newReq: Omit<KasbonRequest, "id"> = {
+        type: "salary",
+        staffUid: currentUserProfile.uid,
+        staffUsername: currentUserProfile.username,
+        staffDisplayName: currentUserProfile.displayName || currentUserProfile.username.toUpperCase(),
+        amount: takeHomePay,
+        reason: `Pencairan gaji ${period}${salaryNote.trim() ? ` — ${salaryNote.trim()}` : ""}`.slice(0, 500),
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        periodMonth: selectedMonth,
+        periodYear: selectedYear,
+        bankName: finalBankName,
+        accountNumber: kasbonAccountNumber.trim(),
+        accountHolderName: kasbonAccountHolder.trim()
+      };
+      await addDoc(collection(db, "kasbon_requests"), newReq);
+      setSalaryNote("");
+      onNotify(`Pencairan gaji ${period} sebesar ${formatRupiah(takeHomePay)} berhasil diajukan ke Admin.`, "success");
+    } catch (err: any) {
+      console.error("Salary request error:", err);
+      onNotify("Gagal mengajukan pencairan gaji: " + (err.message || "Periksa koneksi"), "error");
+    } finally {
+      setSubmittingSalary(false);
+    }
+  };
+
   const handleSubmitKasbon = async (e: React.FormEvent) => {
     e.preventDefault();
     const amountNum = Number(kasbonAmount.replace(/\D/g, ""));
@@ -1175,6 +1238,128 @@ export default function StaffPayslipView({
               </span>
             </div>
           </div>
+
+          {/* SALARY PAYOUT REQUEST (only for released payslips) */}
+          {isPayslipPublished && (
+            <div className="bg-[#0c1017] border border-slate-800 rounded-2xl p-4 space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 flex items-center justify-center">
+                    <Send className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Pencairan Gaji {INDONESIAN_MONTH_NAMES[selectedMonth]} {selectedYear}</span>
+                    <span className="text-[10px] text-slate-400 block">
+                      Ajukan ke Admin agar gaji (take home pay) periode ini ditransfer ke rekening Anda.
+                    </span>
+                  </div>
+                </div>
+                {currentSalaryRequest && (
+                  <span
+                    className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[9.5px] font-bold uppercase border ${
+                      currentSalaryRequest.status === "pending"
+                        ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                        : currentSalaryRequest.status === "approved"
+                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        : "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                    }`}
+                  >
+                    {currentSalaryRequest.status === "pending" ? <Clock className="w-3 h-3" /> : currentSalaryRequest.status === "approved" ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                    <span>
+                      {currentSalaryRequest.status === "pending" ? "Menunggu Admin" : currentSalaryRequest.status === "approved" ? "Dicairkan" : "Ditolak"}
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {currentSalaryRequest && currentSalaryRequest.status !== "rejected" ? (
+                <div className="bg-[#080a0f] border border-slate-850 rounded-xl p-3 text-xs space-y-1">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-slate-400">Nominal diajukan</span>
+                    <strong className="font-mono text-cyan-300">{formatRupiah(currentSalaryRequest.amount)}</strong>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-slate-400">Ke rekening</span>
+                    <span className="text-slate-200 text-right">
+                      {currentSalaryRequest.bankName} {currentSalaryRequest.accountNumber} a.n {currentSalaryRequest.accountHolderName}
+                    </span>
+                  </div>
+                  {currentSalaryRequest.status === "approved" ? (
+                    <p className="text-emerald-400 text-[11px] pt-1">
+                      Disetujui oleh {currentSalaryRequest.approvedBy || "Admin"}
+                      {currentSalaryRequest.approvedAt ? ` pada ${new Date(currentSalaryRequest.approvedAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}` : ""}.
+                    </p>
+                  ) : (
+                    <p className="text-amber-300/90 text-[11px] pt-1">Pengajuan sudah dikirim dan menunggu diproses Admin.</p>
+                  )}
+                  {currentSalaryRequest.amount !== takeHomePay && (
+                    <p className="text-slate-400 text-[11px]">
+                      Catatan: take home pay saat ini {formatRupiah(takeHomePay)} (berubah setelah diajukan).
+                    </p>
+                  )}
+                </div>
+              ) : takeHomePay <= 0 ? (
+                <p className="text-xs text-slate-400">Take home pay periode ini Rp 0, tidak ada gaji yang perlu dicairkan.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {currentSalaryRequest?.status === "rejected" && (
+                    <p className="text-[11px] text-rose-300">
+                      Pengajuan sebelumnya ditolak{currentSalaryRequest.adminNote ? `: ${currentSalaryRequest.adminNote}` : ""}. Anda bisa mengajukan ulang.
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <select
+                      value={kasbonBankName}
+                      onChange={(e) => setKasbonBankName(e.target.value)}
+                      className="bg-[#080a0f] border border-slate-800 focus:border-cyan-500 rounded-xl py-2 px-3 text-xs text-slate-200 focus:outline-none"
+                      aria-label="Bank / E-Wallet tujuan"
+                    >
+                      {PAYMENT_ACCOUNT_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    <input
+                      value={kasbonAccountNumber}
+                      onChange={(e) => setKasbonAccountNumber(e.target.value)}
+                      placeholder="No. rekening / HP e-wallet"
+                      inputMode="numeric"
+                      className="bg-[#080a0f] border border-slate-800 focus:border-cyan-500 rounded-xl py-2 px-3 text-xs text-slate-200 focus:outline-none font-mono"
+                    />
+                    <input
+                      value={kasbonAccountHolder}
+                      onChange={(e) => setKasbonAccountHolder(e.target.value)}
+                      placeholder="Atas nama"
+                      className="bg-[#080a0f] border border-slate-800 focus:border-cyan-500 rounded-xl py-2 px-3 text-xs text-slate-200 focus:outline-none"
+                    />
+                    {kasbonBankName === "Lainnya / Bank Lain" && (
+                      <input
+                        value={kasbonCustomBank}
+                        onChange={(e) => setKasbonCustomBank(e.target.value)}
+                        placeholder="Nama bank / e-wallet"
+                        className="sm:col-span-3 bg-[#080a0f] border border-slate-800 focus:border-cyan-500 rounded-xl py-2 px-3 text-xs text-slate-200 focus:outline-none"
+                      />
+                    )}
+                    <input
+                      value={salaryNote}
+                      onChange={(e) => setSalaryNote(e.target.value)}
+                      placeholder="Catatan untuk Admin (opsional)"
+                      maxLength={200}
+                      className="sm:col-span-3 bg-[#080a0f] border border-slate-800 focus:border-cyan-500 rounded-xl py-2 px-3 text-xs text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRequestSalary}
+                    disabled={submittingSalary}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-extrabold cursor-pointer disabled:opacity-50"
+                  >
+                    {submittingSalary ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    Ajukan Pencairan Gaji {formatRupiah(takeHomePay)}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* PRINT-READY PAYSLIP PREVIEW */}
           <div className="bg-white text-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-300 relative">

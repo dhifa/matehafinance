@@ -343,6 +343,8 @@ export interface CustomRole {
 
 export interface KasbonRequest {
   id: string;
+  /** "salary" = pencairan gaji dari slip yang sudah rilis (bukan potongan); default/undefined = kasbon */
+  type?: "kasbon" | "salary";
   staffUid: string;
   staffUsername: string;
   staffDisplayName?: string;
@@ -360,6 +362,9 @@ export interface KasbonRequest {
   accountNumber?: string; // Nomor rekening / no HP akun e-wallet
   accountHolderName?: string; // Nama pemilik rekening / Atas Nama
 }
+
+/** Salary payout requests share kasbon_requests but are never salary deductions. */
+export const isSalaryRequest = (k: Pick<KasbonRequest, "type">) => k.type === "salary";
 
 export type KasbonPlafondType = "percent" | "auto" | "fixed" | "unlimited";
 

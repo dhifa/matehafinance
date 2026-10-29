@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { collection, onSnapshot, doc, setDoc, getDoc, query, updateDoc } from "../lib/firestore";
 import { db } from "../utils/backend";
-import { EventProject, UserProfile, formatRupiah, PublishedPayslip, KasbonRequest } from "../types";
+import { EventProject, UserProfile, formatRupiah, PublishedPayslip, KasbonRequest, isSalaryRequest } from "../types";
 import { calculateProjectBudget } from "../utils/math";
 import html2canvas from 'html2canvas';
 import { jsPDF } from "jspdf";
@@ -105,6 +105,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
   const [kasbonList, setKasbonList] = useState<KasbonRequest[]>([]);
   const [loadingKasbon, setLoadingKasbon] = useState(true);
   const [kasbonStatusFilter, setKasbonStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [kasbonTypeFilter, setKasbonTypeFilter] = useState<"all" | "kasbon" | "salary">("all");
   const [kasbonSearchQuery, setKasbonSearchQuery] = useState<string>("");
   const [copiedKasbonId, setCopiedKasbonId] = useState<string | null>(null);
 
@@ -328,7 +329,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
       // Approved Kasbon for this staff in this period
       const approvedKasbons = kasbonList.filter((k) => {
         const matchStaff = (k.staffUsername || "").toLowerCase().trim() === username;
-        if (!matchStaff || k.status !== "approved") return false;
+        if (!matchStaff || k.status !== "approved" || isSalaryRequest(k)) return false;
         if (k.periodMonth !== undefined && k.periodYear !== undefined) {
           return k.periodMonth === selectedMonth && k.periodYear === selectedYear;
         }
@@ -343,8 +344,20 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
 
       // Pending Kasbon for this staff
       const pendingKasbons = kasbonList.filter((k) => {
-        return (k.staffUsername || "").toLowerCase().trim() === username && k.status === "pending";
+        return (k.staffUsername || "").toLowerCase().trim() === username && k.status === "pending" && !isSalaryRequest(k);
       });
+
+      // Latest salary payout request from this staff for the period
+      const salaryRequest =
+        kasbonList
+          .filter(
+            (k) =>
+              isSalaryRequest(k) &&
+              (k.staffUsername || "").toLowerCase().trim() === username &&
+              k.periodMonth === selectedMonth &&
+              k.periodYear === selectedYear
+          )
+          .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0] || null;
 
       // Published payslip record
       const payslipKey = `${username}-${selectedYear}-${selectedMonth}`;
@@ -391,7 +404,8 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
         takeHomePay,
         isPublished,
         payslipKey,
-        savedDoc
+        savedDoc,
+        salaryRequest
       };
     });
   }, [dbUsers, projects, selectedMonth, selectedYear, kasbonList, publishedPayslips]);
@@ -470,6 +484,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
     return kasbonList
       .filter((k) => {
         if (kasbonStatusFilter !== "all" && k.status !== kasbonStatusFilter) return false;
+        if (kasbonTypeFilter !== "all" && isSalaryRequest(k) !== (kasbonTypeFilter === "salary")) return false;
         if (kasbonSearchQuery.trim()) {
           const q = kasbonSearchQuery.toLowerCase().trim();
           const matchStaff = (k.staffUsername || "").toLowerCase().includes(q) || (k.staffDisplayName || "").toLowerCase().includes(q);
@@ -480,7 +495,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
         return true;
       })
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  }, [kasbonList, kasbonStatusFilter, kasbonSearchQuery]);
+  }, [kasbonList, kasbonStatusFilter, kasbonTypeFilter, kasbonSearchQuery]);
 
   // Handle Admin ACC / Approve / Reject Kasbon
   const handleUpdateKasbonStatus = async (id: string, newStatus: "approved" | "rejected" | "pending") => {
@@ -496,8 +511,15 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
         approvedBy: newStatus === "pending" ? null : (currentUserProfile?.displayName || currentUserProfile?.username || "Admin")
       };
       await updateDoc(kasbonRef, updateData);
+      const isSalary = isSalaryRequest(kasbonList.find((k) => k.id === id) || {});
       onNotify(
-        newStatus === "approved"
+        isSalary
+          ? newStatus === "approved"
+            ? "Pencairan gaji disetujui. Jangan lupa transfer ke rekening staf."
+            : newStatus === "rejected"
+            ? "Pengajuan pencairan gaji ditolak."
+            : "Status pencairan gaji dikembalikan ke Menunggu."
+          : newStatus === "approved"
           ? "Kasbon berhasil di-ACC (Disetujui)! Nominal langsung otomatis masuk ke potongan slip gaji staf."
           : newStatus === "rejected"
           ? "Kasbon telah ditolak."
@@ -1158,6 +1180,18 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
                               <span>Draft</span>
                             </span>
                           )}
+                          {s.salaryRequest && s.salaryRequest.status !== "rejected" && (
+                            <span
+                              className={`mt-1 block mx-auto w-fit px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                                s.salaryRequest.status === "approved"
+                                  ? "bg-cyan-500/10 text-cyan-300 border-cyan-500/25"
+                                  : "bg-amber-500/10 text-amber-400 border-amber-500/25"
+                              }`}
+                              title={`Pencairan gaji ${formatRupiah(s.salaryRequest.amount)}`}
+                            >
+                              {s.salaryRequest.status === "approved" ? "Gaji Dicairkan" : "Minta Cair"}
+                            </span>
+                          )}
                         </td>
 
                         {/* Aksi */}
@@ -1307,6 +1341,21 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
                   {st === "all" ? "Semua Status" : st === "pending" ? "Menunggu ACC" : st === "approved" ? "Disetujui (ACC)" : "Ditolak"}
                 </button>
               ))}
+              <span className="hidden md:inline w-px h-5 bg-slate-800 mx-1" />
+              {(["all", "kasbon", "salary"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setKasbonTypeFilter(t)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-mono font-bold transition cursor-pointer ${
+                    kasbonTypeFilter === t
+                      ? "bg-cyan-500 text-slate-950 shadow-md font-extrabold"
+                      : "bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-850"
+                  }`}
+                >
+                  {t === "all" ? "Semua Jenis" : t === "kasbon" ? "Kasbon" : "Pencairan Gaji"}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1344,6 +1393,11 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
                           <span className="font-extrabold text-white text-sm block">
                             {k.staffDisplayName || k.staffUsername.toUpperCase()}
                           </span>
+                          {isSalaryRequest(k) && (
+                            <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                              Pencairan Gaji
+                            </span>
+                          )}
                           <span className="text-[9.5px] text-slate-500 font-mono">
                             {new Date(k.createdAt).toLocaleDateString("id-ID", {
                               day: "numeric",
@@ -1366,7 +1420,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
                         ) : k.status === "approved" ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[9.5px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                             <CheckCircle2 className="w-3 h-3" />
-                            <span>Di-ACC</span>
+                            <span>{isSalaryRequest(k) ? "Dicairkan" : "Di-ACC"}</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[9.5px] font-bold uppercase bg-rose-500/15 text-rose-400 border border-rose-500/30">
@@ -1381,7 +1435,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
                     <div className="bg-[#080a0f] border border-slate-850 p-3 rounded-xl flex items-baseline justify-between">
                       <div>
                         <span className="text-[9px] uppercase font-mono text-slate-500 block">
-                          Nominal Kasbon:
+                          {isSalaryRequest(k) ? "Gaji (Take Home Pay):" : "Nominal Kasbon:"}
                         </span>
                         <span className="text-lg font-mono font-black text-amber-400">
                           {formatRupiah(k.amount)}
@@ -1390,7 +1444,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
                       {k.periodMonth !== undefined && k.periodYear !== undefined && (
                         <div className="text-right">
                           <span className="text-[9px] uppercase font-mono text-slate-500 block">
-                            Periode Potong:
+                            {isSalaryRequest(k) ? "Periode Gaji:" : "Periode Potong:"}
                           </span>
                           <span className="text-[10px] font-mono text-slate-300 font-bold">
                             {INDONESIAN_MONTH_NAMES[k.periodMonth]} {k.periodYear}
@@ -1480,7 +1534,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
                           className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded-xl text-xs font-extrabold transition cursor-pointer shadow-md flex items-center justify-center space-x-1"
                         >
                           <Check className="w-3.5 h-3.5" />
-                          <span>Setujui (ACC)</span>
+                          <span>{isSalaryRequest(k) ? "Setujui & Cairkan" : "Setujui (ACC)"}</span>
                         </button>
                       </div>
                     ) : k.status === "approved" ? (
