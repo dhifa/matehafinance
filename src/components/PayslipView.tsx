@@ -20,6 +20,7 @@ import {
   PlusCircle, 
   MinusCircle,
   UploadCloud, 
+  MessageCircle,
   TrendingUp, 
   Briefcase,
   Wallet,
@@ -46,6 +47,7 @@ import {
   Award
 } from "lucide-react";
 import logo from "/favicon.png";
+import PayslipBlastModal from "./PayslipBlastModal";
 import ttd from "../../assets/ttd.png";
 import { formatMultiDates, parseIndonesianDateText } from "../utils/date";
 import { saveAs } from "file-saver";
@@ -105,6 +107,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
   const [kasbonList, setKasbonList] = useState<KasbonRequest[]>([]);
   const [loadingKasbon, setLoadingKasbon] = useState(true);
   const [kasbonStatusFilter, setKasbonStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [showBlast, setShowBlast] = useState(false);
   const [kasbonTypeFilter, setKasbonTypeFilter] = useState<"all" | "kasbon" | "salary">("all");
   const [kasbonSearchQuery, setKasbonSearchQuery] = useState<string>("");
   const [copiedKasbonId, setCopiedKasbonId] = useState<string | null>(null);
@@ -861,6 +864,16 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
               <UploadCloud className="w-3.5 h-3.5 text-slate-950" />
               <span>Publikasikan Semua</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setShowBlast(true)}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl text-xs transition shadow-lg shadow-emerald-950/40 cursor-pointer"
+              title="Umumkan di grup WhatsApp bahwa slip gaji sudah rilis"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-slate-950" />
+              <span>Blast WhatsApp</span>
+            </button>
           </div>
         </div>
 
@@ -1570,6 +1583,16 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
             </div>
           )}
         </div>
+      )}
+
+      {showBlast && (
+        <PayslipBlastModal
+          periodLabel={`${INDONESIAN_MONTH_NAMES[selectedMonth]} ${selectedYear}`}
+          releasedNames={allStaffCalculatedData.filter((s) => s.isPublished).map((s) => s.displayName)}
+          draftCount={allStaffCalculatedData.filter((s) => !s.isPublished && s.totalGrossEarnings > 0).length}
+          onClose={() => setShowBlast(false)}
+          onNotify={onNotify}
+        />
       )}
 
       {/* ========================================================================= */}
