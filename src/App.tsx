@@ -1046,7 +1046,7 @@ export default function App() {
 
   // Update active project info
   const handleUpdateProjectInfo = async (
-    field: "name" | "date" | "location" | "paymentStatus" | "dpAmount" | "picBonusStaff" | "callTime" | "picName" | "mapsUrl" | "rundownUrl" | "crewNotes",
+    field: "name" | "date" | "location" | "paymentStatus" | "dpAmount" | "picBonusStaff" | "callTime" | "picName" | "mapsUrl" | "meetingPoint" | "rundownUrl" | "crewNotes",
     value: any
   ) => {
     if (!activeProject) return;
@@ -1656,11 +1656,12 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                     <Megaphone className="w-3.5 h-3.5" /> Blast WA ke Kru
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
                   {([
                     ["callTime", "Call Time", "mis. 06:00"],
                     ["picName", "PIC Lapangan", "mis. Dhifa (0812...)"],
-                    ["mapsUrl", "Link Google Maps", "https://maps.app.goo.gl/..."],
+                    ["mapsUrl", "Maps Lokasi Venue", "https://maps.app.goo.gl/..."],
+                    ["meetingPoint", "Titik Kumpul Tim", "Kosong = Kantor Mateha"],
                     ["rundownUrl", "Link Rundown / Catatan", "https://..."],
                   ] as const).map(([field, label, placeholder]) => (
                     <div key={field}>

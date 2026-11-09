@@ -12,7 +12,10 @@ export const EVENT_BLAST_KINDS: { key: EventBlastKind; label: string }[] = [
   { key: "pembatalan", label: "Pembatalan" },
 ];
 
-export const TEMPLATE_VARIABLES = ["nama", "acara", "tanggal", "call_time", "lokasi", "maps", "pic", "rundown", "catatan"];
+export const TEMPLATE_VARIABLES = ["nama", "acara", "tanggal", "call_time", "lokasi", "maps", "titik_kumpul", "pic", "rundown", "catatan"];
+
+/** Where the crew gathers before leaving, unless an event sets its own meeting point. */
+export const DEFAULT_MEETING_POINT = "Kantor Mateha — https://maps.app.goo.gl/m1sABY77cMVRf3Zx8";
 
 export const DEFAULT_EVENT_TEMPLATES: Record<EventBlastKind, string> = {
   info: [
@@ -22,7 +25,8 @@ export const DEFAULT_EVENT_TEMPLATES: Record<EventBlastKind, string> = {
     "📅 Tanggal: {tanggal}",
     "⏰ Call time: {call_time}",
     "📍 Lokasi: {lokasi}",
-    "🗺️ Maps: {maps}",
+    "🗺️ Maps lokasi venue: {maps}",
+    "🚩 Titik kumpul tim: {titik_kumpul}",
     "👤 PIC: {pic}",
     "📋 Rundown: {rundown}",
     "📝 Catatan: {catatan}",
@@ -38,7 +42,8 @@ export const DEFAULT_EVENT_TEMPLATES: Record<EventBlastKind, string> = {
     "📅 Tanggal: {tanggal}",
     "⏰ Call time: {call_time}",
     "📍 Lokasi: {lokasi}",
-    "🗺️ Maps: {maps}",
+    "🗺️ Maps lokasi venue: {maps}",
+    "🚩 Titik kumpul tim: {titik_kumpul}",
     "👤 PIC: {pic}",
     "",
     "Mohon sesuaikan jadwal Anda. Terima kasih 🙏",

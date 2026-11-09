@@ -150,6 +150,7 @@ export interface EventProject {
   callTime?: string; // e.g. "06:00"
   picName?: string;
   mapsUrl?: string;
+  meetingPoint?: string; // crew meeting point; empty = Kantor Mateha
   rundownUrl?: string;
   crewNotes?: string;
 }

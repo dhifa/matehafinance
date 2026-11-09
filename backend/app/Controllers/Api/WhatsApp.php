@@ -21,6 +21,8 @@ class WhatsApp extends BaseApiController
     private const BATCH_SIZE    = 5;
     private const SEND_GAP_US   = 1_200_000;
     private const LINK_TTL_DAYS = 30;
+    /** Where the crew gathers before leaving, unless an event sets its own meeting point */
+    private const DEFAULT_MEETING_POINT = 'Kantor Mateha — https://maps.app.goo.gl/m1sABY77cMVRf3Zx8';
     private const MONTHS        = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
     // ------------------------------------------------------------------
@@ -294,6 +296,7 @@ class WhatsApp extends BaseApiController
             'call_time' => (string) (($event['callTime'] ?? '') ?: '-'),
             'lokasi'    => (string) (($event['location'] ?? '') ?: '-'),
             'maps'      => (string) (($event['mapsUrl'] ?? '') ?: '-'),
+            'titik_kumpul' => (string) (($event['meetingPoint'] ?? '') ?: self::DEFAULT_MEETING_POINT),
             'pic'       => (string) (($event['picName'] ?? '') ?: '-'),
             'rundown'   => (string) (($event['rundownUrl'] ?? '') ?: '-'),
             'catatan'   => (string) (($event['crewNotes'] ?? '') ?: '-'),

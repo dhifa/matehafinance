@@ -6,6 +6,7 @@ import { apiFetch as aiFetch } from "../lib/api";
 import { EventProject } from "../types";
 import {
   DEFAULT_EVENT_TEMPLATES,
+  DEFAULT_MEETING_POINT,
   EVENT_BLAST_KINDS,
   EventBlastKind,
   TEMPLATE_VARIABLES,
@@ -69,6 +70,7 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
     call_time: event.callTime || "-",
     lokasi: event.location || "-",
     maps: event.mapsUrl || "-",
+    titik_kumpul: event.meetingPoint || DEFAULT_MEETING_POINT,
     pic: event.picName || "-",
     rundown: event.rundownUrl || "-",
     catatan: event.crewNotes || "-",
