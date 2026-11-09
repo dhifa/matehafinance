@@ -9,6 +9,7 @@ import { Download, Printer, FileText, Loader2, Copy, Check, UserCheck, Trash2 } 
 import InvoiceDocument from "./documents/InvoiceDocument";
 import DocumentPreviewShell, { primaryToolbarButton, toolbarButton } from "./documents/DocumentPreviewShell";
 import { itemSummaryText } from "../utils/lineItems";
+import { discountLabel } from "../utils/discount";
 
 export default function InvoicePreview({
   invoice,
@@ -65,6 +66,10 @@ export default function InvoicePreview({
       `Ditagihkan Kepada: *${invoice.customerName}* ${invoice.customerContact ? `(PIC: ${invoice.customerContact})` : ''}\n` +
       `Perihal: *${invoice.subject || 'Tagihan Layanan Event'}*\n\n` +
       `*Rincian Tagihan:*\n${itemsText}\n\n` +
+      (invoice.discountAmount
+        ? `Subtotal: ${formatRupiah((invoice.subtotal ?? invoice.grandTotal + invoice.discountAmount))}\n` +
+          `${discountLabel(invoice)}: -${formatRupiah(invoice.discountAmount)}\n`
+        : '') +
       `*Total Tagihan: ${formatRupiah(invoice.grandTotal)}*\n` +
       `_(Terbilang: ${terbilangText})_\n` +
       `${bankText}\n\n` +

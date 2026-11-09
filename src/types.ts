@@ -1,3 +1,4 @@
+import type { DocumentDiscount } from "./utils/discount";
 export type TabType =
   | "sheets"
   | "dashboard"
@@ -63,7 +64,7 @@ export interface QuotationItem {
   total: number; // qty × days × price + sub-item add-costs
 }
 
-export interface Quotation {
+export interface Quotation extends DocumentDiscount {
   id: string;
   quotationNumber: string;
   customerName: string;
@@ -87,7 +88,7 @@ export interface Quotation {
 
 export type InvoiceItem = QuotationItem;
 
-export interface Invoice {
+export interface Invoice extends DocumentDiscount {
   id: string;
   invoiceNumber: string;
   customerName: string;

@@ -20,6 +20,7 @@ import {
 import PaginatedDocument, { FlowUnit } from "./PaginatedDocument";
 import { itemRowUnits } from "./itemRows";
 import { itemsHaveTime } from "../../utils/lineItems";
+import { discountLabel } from "../../utils/discount";
 
 export const QUOTATION_DEFAULT_TERMS = [
   "Harga sudah termasuk biaya instalasi dan operator teknisi selama acara.",
@@ -96,7 +97,10 @@ export default function QuotationDocument({
         <TotalsWithTerbilang
           terbilang={`${terbilang(quotation.grandTotal)} Rupiah`}
           lines={[
-            { label: "Subtotal", value: formatRupiah(quotation.grandTotal) },
+            { label: "Subtotal", value: formatRupiah(quotation.discountAmount ? quotation.subtotal ?? quotation.grandTotal + quotation.discountAmount : quotation.grandTotal) },
+            ...(quotation.discountAmount
+              ? [{ label: discountLabel(quotation), value: `−${formatRupiah(quotation.discountAmount)}`, variant: "muted" as const }]
+              : []),
             { label: "Total Penawaran", value: formatRupiah(quotation.grandTotal), variant: "grand" },
           ]}
         />

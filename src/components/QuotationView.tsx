@@ -12,6 +12,8 @@ import { generateQuotationPdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
 import { notify } from "../utils/notification";
 import LineItemFields from "./LineItemFields";
+import DiscountFields from "./DiscountFields";
+import { DiscountType, computeDiscount, discountFields } from "../utils/discount";
 import { LineItemDraft, draftFromItem, emptyLineItem, formatQty, formatTime, mainAmount, newItemId, normalizeItem, subItemAmount, validateLineItem } from "../utils/lineItems";
 
 interface QuotationViewProps {
@@ -55,6 +57,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [validUntil, setValidUntil] = useState("");
   const [items, setItems] = useState<QuotationItem[]>([]);
+  const [discountType, setDiscountType] = useState<DiscountType | "none">("none");
+  const [discountValue, setDiscountValue] = useState(0);
   const [termsAndConditions, setTermsAndConditions] = useState("Penawaran ini berlaku selama 14 hari kerja sejak diterbitkan.");
   const [saveToClientDb, setSaveToClientDb] = useState(false);
 
@@ -195,7 +199,9 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
     const sanitizedItems = currentItems.map((item, idx) => normalizeItem(item, item.id || `quo_item_${idx}_${Date.now()}`));
 
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
-    const grandTotal = sanitizedItems.reduce((sum, item) => sum + item.total, 0);
+    const itemsSubtotal = sanitizedItems.reduce((sum, item) => sum + item.total, 0);
+    const discount = discountFields(itemsSubtotal, discountType, discountValue);
+    const grandTotal = itemsSubtotal - (discount.discountAmount || 0);
     
     try {
       if (editModeId) {
@@ -212,6 +218,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
           date,
           validUntil,
           items: sanitizedItems,
+          ...discount,
           grandTotal,
           status: existingQuo?.status || "draft",
           createdAt: existingQuo?.createdAt || new Date().toISOString(),
@@ -267,7 +274,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
           subject: subject.trim() || "Penawaran Kerjasama Acara",
           date,
           validUntil,
-          items,
+          items: sanitizedItems,
+          ...discount,
           grandTotal,
           status: "draft",
           createdAt: new Date().toISOString(),
@@ -336,6 +344,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
     setDate(quo.date);
     setValidUntil(quo.validUntil || "");
     setItems(quo.items ? JSON.parse(JSON.stringify(quo.items)) : []);
+    setDiscountType(quo.discountType || "none");
+    setDiscountValue(quo.discountValue || 0);
     setSelectedBankIds(quo.selectedBanks ? quo.selectedBanks.map(b => b.id) : []);
     setTermsAndConditions(quo.termsAndConditions || "Penawaran ini berlaku selama 14 hari kerja sejak diterbitkan.");
     setShowClientApproval(!!quo.showClientApproval);
@@ -353,6 +363,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
     setCustomerContact("");
     setSubject("");
     setItems([]);
+    setDiscountType("none");
+    setDiscountValue(0);
     setDate(new Date().toISOString().split("T")[0]);
     setValidUntil("");
     setSelectedBankIds([]);
@@ -405,6 +417,9 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
         dueDate: "",
         subject: quo.subject || "Pembayaran Acara",
         items: quo.items.map(i => ({ ...i, id: Date.now().toString() + Math.random().toString(36).substring(2, 6) })),
+        ...(quo.discountAmount
+          ? { subtotal: quo.subtotal, discountType: quo.discountType, discountValue: quo.discountValue, discountAmount: quo.discountAmount }
+          : {}),
         grandTotal: quo.grandTotal,
         status: "draft" as const,
         createdAt: new Date().toISOString(),
@@ -440,7 +455,9 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
     (q.subject && q.subject.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const grandTotalAll = items.reduce((sum, item) => sum + item.total, 0);
+  const itemsSubtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const discountAmountNow = computeDiscount(itemsSubtotal, discountType, discountValue);
+  const grandTotalAll = itemsSubtotal - discountAmountNow;
 
   return (
     <div className="text-white space-y-6">
@@ -929,9 +946,34 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
                 );
               })}
 
-              <div className="flex justify-between items-center px-4 py-3 bg-slate-900/95 rounded-xl border border-slate-700/80 mt-3">
-                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">TOTAL ESTIMASI PENAWARAN:</span>
-                <span className="text-base font-extrabold text-cyan-400 font-mono">{formatRupiah(grandTotalAll)}</span>
+              <DiscountFields
+                subtotal={itemsSubtotal}
+                type={discountType}
+                value={discountValue}
+                onChange={(t, v) => {
+                  setDiscountType(t);
+                  setDiscountValue(v);
+                }}
+                accent="cyan"
+              />
+
+              <div className="px-4 py-3 bg-slate-900/95 rounded-xl border border-slate-700/80 mt-3 space-y-1">
+                {discountAmountNow > 0 && (
+                  <>
+                    <div className="flex justify-between text-xs text-slate-400 font-mono">
+                      <span>Subtotal</span>
+                      <span>{formatRupiah(itemsSubtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-rose-300 font-mono">
+                      <span>Diskon{discountType === "percent" ? ` (${discountValue}%)` : ""}</span>
+                      <span>−{formatRupiah(discountAmountNow)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">TOTAL ESTIMASI PENAWARAN:</span>
+                  <span className="text-base font-extrabold text-cyan-400 font-mono">{formatRupiah(grandTotalAll)}</span>
+                </div>
               </div>
             </div>
           )}

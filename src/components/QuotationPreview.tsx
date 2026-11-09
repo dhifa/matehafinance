@@ -9,6 +9,7 @@ import { Download, Printer, FileText, Loader2, Copy, Check, UserCheck, Trash2 } 
 import QuotationDocument from "./documents/QuotationDocument";
 import DocumentPreviewShell, { primaryToolbarButton, toolbarButton } from "./documents/DocumentPreviewShell";
 import { itemSummaryText } from "../utils/lineItems";
+import { discountLabel } from "../utils/discount";
 
 export default function QuotationPreview({
   quotation,
@@ -63,6 +64,10 @@ export default function QuotationPreview({
       `Kepada Yth: *${quotation.customerName}* ${quotation.customerContact ? `(PIC: ${quotation.customerContact})` : ''}\n` +
       `Perihal: *${quotation.subject || 'Penawaran Kerjasama Event'}*\n\n` +
       `*Rincian Penawaran:*\n${itemsText}\n\n` +
+      (quotation.discountAmount
+        ? `Subtotal: ${formatRupiah((quotation.subtotal ?? quotation.grandTotal + quotation.discountAmount))}\n` +
+          `${discountLabel(quotation)}: -${formatRupiah(quotation.discountAmount)}\n`
+        : '') +
       `*Total Penawaran: ${formatRupiah(quotation.grandTotal)}*\n` +
       `_(Terbilang: ${terbilangText})_\n` +
       `${bankText}\n\n` +

@@ -13,6 +13,8 @@ import { generateInvoicePdfBlob } from "../utils/pdfGenerator";
 import { saveAs } from "file-saver";
 import { notify } from "../utils/notification";
 import LineItemFields from "./LineItemFields";
+import DiscountFields from "./DiscountFields";
+import { DiscountType, computeDiscount, discountFields } from "../utils/discount";
 import { LineItemDraft, draftFromItem, emptyLineItem, formatQty, formatTime, mainAmount, newItemId, normalizeItem, subItemAmount, validateLineItem } from "../utils/lineItems";
 
 interface InvoiceViewProps {
@@ -56,6 +58,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [discountType, setDiscountType] = useState<DiscountType | "none">("none");
+  const [discountValue, setDiscountValue] = useState(0);
   const [termsAndConditions, setTermsAndConditions] = useState("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
   const [saveToClientDb, setSaveToClientDb] = useState(false);
 
@@ -220,6 +224,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     setDate(inv.date);
     setDueDate(inv.dueDate || "");
     setItems(inv.items ? JSON.parse(JSON.stringify(inv.items)) : []);
+    setDiscountType(inv.discountType || "none");
+    setDiscountValue(inv.discountValue || 0);
     setSelectedBankIds(inv.selectedBanks ? inv.selectedBanks.map(b => b.id) : []);
     setTermsAndConditions(inv.termsAndConditions || "Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
     setShowClientApproval(!!inv.showClientApproval);
@@ -242,6 +248,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     setCustomerContact("");
     setSubject("");
     setItems([]);
+    setDiscountType("none");
+    setDiscountValue(0);
     setDate(new Date().toISOString().split("T")[0]);
     setDueDate("");
     setSelectedBankIds([]);
@@ -279,7 +287,10 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     const sanitizedItems = currentItems.map((item, idx) => normalizeItem(item, item.id || `item_${idx}_${Date.now()}`));
 
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
-    const subtotalItems = sanitizedItems.reduce((sum, item) => sum + item.total, 0);
+    const itemsSubtotal = sanitizedItems.reduce((sum, item) => sum + item.total, 0);
+    const discount = discountFields(itemsSubtotal, discountType, discountValue);
+    // Contract value after the discount; DP and remaining amounts are based on it
+    const subtotalItems = itemsSubtotal - (discount.discountAmount || 0);
 
     const finalIsDp = !!isDp;
     let finalGrandTotal = subtotalItems;
@@ -318,6 +329,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
           date,
           dueDate: dueDate || "",
           items: sanitizedItems,
+          ...discount,
           grandTotal: finalGrandTotal,
           status: existingInv?.status || "draft",
           createdAt: existingInv?.createdAt || new Date().toISOString(),
@@ -381,6 +393,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
           date,
           dueDate: dueDate || "",
           items: sanitizedItems,
+          ...discount,
           grandTotal: finalGrandTotal,
           status: "draft",
           createdAt: new Date().toISOString(),
@@ -430,6 +443,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
         setCustomerContact("");
         setSubject("");
         setItems([]);
+    setDiscountType("none");
+    setDiscountValue(0);
         setDate(new Date().toISOString().split("T")[0]);
         setDueDate("");
         setSelectedBankIds([]);
@@ -462,7 +477,10 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     (inv.subject && inv.subject.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const grandTotalAll = items.reduce((sum, item) => sum + item.total, 0);
+  const itemsSubtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const discountAmountNow = computeDiscount(itemsSubtotal, discountType, discountValue);
+  // Contract value after the discount (DP is calculated from this)
+  const grandTotalAll = itemsSubtotal - discountAmountNow;
 
   return (
     <div className="text-white space-y-6">
@@ -928,6 +946,30 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
                   </div>
                 );
               })}
+
+              <DiscountFields
+                subtotal={itemsSubtotal}
+                type={discountType}
+                value={discountValue}
+                onChange={(t, v) => {
+                  setDiscountType(t);
+                  setDiscountValue(v);
+                }}
+                accent="blue"
+              />
+
+              {discountAmountNow > 0 && (
+                <div className="px-4 pt-3 space-y-1 text-xs font-mono">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Subtotal</span>
+                    <span>{formatRupiah(itemsSubtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-rose-300">
+                    <span>Diskon{discountType === "percent" ? ` (${discountValue}%)` : ""}</span>
+                    <span>−{formatRupiah(discountAmountNow)}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 py-3 bg-slate-900/95 rounded-xl border border-slate-700/80 mt-3 gap-2">
                 <div className="flex items-center gap-2">

@@ -22,11 +22,13 @@ import {
 import PaginatedDocument, { FlowUnit } from "./PaginatedDocument";
 import { itemRowUnits } from "./itemRows";
 import { itemsHaveTime } from "../../utils/lineItems";
+import { discountLabel } from "../../utils/discount";
 
 export const INVOICE_DEFAULT_TERMS = ["Bukti transfer mohon dikirimkan ke admin untuk verifikasi pembayaran."];
 
 export function getInvoiceTotals(invoice: Invoice) {
-  const contractTotal = invoice.totalAmount || invoice.items.reduce((s, itm) => s + itm.total, 0);
+  const itemsSubtotal = invoice.subtotal ?? invoice.items.reduce((s, itm) => s + itm.total, 0);
+  const contractTotal = invoice.totalAmount || itemsSubtotal - (invoice.discountAmount || 0);
   const remaining = invoice.remainingAmount ?? Math.max(0, contractTotal - invoice.grandTotal);
   return { contractTotal, remaining };
 }
@@ -82,15 +84,24 @@ export default function InvoiceDocument({
     </>
   );
 
+  // Shown only when the invoice has a discount: items subtotal, then the discount
+  const discountLines: TotalLine[] = invoice.discountAmount
+    ? [
+        { label: "Subtotal", value: formatRupiah(contractTotal + invoice.discountAmount) },
+        { label: discountLabel(invoice), value: `−${formatRupiah(invoice.discountAmount)}`, variant: "muted" },
+      ]
+    : [];
+
   const totalLines: TotalLine[] = invoice.isDp
     ? [
+        ...discountLines,
         { label: "Total Nilai Kontrak", value: formatRupiah(contractTotal) },
         { label: `Uang Muka (${dpLabel})`, value: formatRupiah(invoice.grandTotal), variant: "highlight" },
         { label: "Total Tagihan", value: formatRupiah(invoice.grandTotal), variant: "grand" },
         { label: "Sisa tagihan (pelunasan)", value: formatRupiah(remaining), variant: "muted" },
       ]
     : [
-        { label: "Subtotal", value: formatRupiah(invoice.grandTotal) },
+        ...(discountLines.length ? discountLines : [{ label: "Subtotal", value: formatRupiah(invoice.grandTotal) }]),
         { label: "Total Tagihan", value: formatRupiah(invoice.grandTotal), variant: "grand" },
       ];
 
