@@ -73,8 +73,13 @@ export default function SendWhatsAppModal({
   const openWhatsApp = async () => {
     setBusy("open");
     setError(null);
-    // Open the window first (inside the click) so pop-up blockers allow it
-    const win = window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    // Open the window first (inside the click) so pop-up blockers allow it. "noopener" would
+    // make window.open return null even on success, so detach the opener by hand instead.
+    const win = window.open("", "_blank");
+    if (win) {
+      win.opener = null;
+      win.location.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`;
+    }
     try {
       if (downloadPdf) saveAs(await buildPdf(), fileName);
       if (!win) setError("Browser memblokir jendela baru. Izinkan pop-up untuk situs ini, lalu coba lagi.");

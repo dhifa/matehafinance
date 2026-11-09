@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "../lib/firestore";
 import { db, sanitizeForFirestore } from "../utils/backend";
 import { Invoice, InvoiceItem, formatRupiah, Bank, Client } from "../types";
@@ -81,6 +81,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [editItemDraft, setEditItemDraft] = useState<LineItemDraft>(emptyLineItem());
 
+  const defaultBanksApplied = useRef(false);
+
   useEffect(() => {
     const qInv = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
     const unsubInv = onSnapshot(qInv, (snapshot) => {
@@ -94,10 +96,12 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
       const bks: Bank[] = [];
       snapshot.forEach((doc) => bks.push({ id: doc.id, ...doc.data() } as Bank));
       setBanks(bks);
-      // Auto-select default bank if none selected yet
-      if (bks.length > 0 && selectedBankIds.length === 0) {
+      // Pre-select the default banks once, when the bank list first arrives. Later
+      // snapshots (CI4 polls every few seconds) must not undo the user's choice.
+      if (!defaultBanksApplied.current && bks.length > 0) {
+        defaultBanksApplied.current = true;
         const defaults = bks.filter(b => b.isDefault).map(b => b.id);
-        if (defaults.length > 0) setSelectedBankIds(defaults);
+        setSelectedBankIds(prev => (prev.length === 0 ? defaults : prev));
       }
     });
 
@@ -252,7 +256,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     setDiscountValue(0);
     setDate(new Date().toISOString().split("T")[0]);
     setDueDate("");
-    setSelectedBankIds([]);
+    setSelectedBankIds(banks.filter(b => b.isDefault).map(b => b.id));
     setTermsAndConditions("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
     setShowClientApproval(false);
     setClientApprovalName("");
@@ -317,7 +321,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     try {
       if (editModeId) {
         const existingInv = invoices.find(inv => inv.id === editModeId);
-        const finalBanks = selectedBanks.length > 0 ? selectedBanks : (existingInv?.selectedBanks || []);
+        // Exactly the banks ticked in the form (none ticked = no bank on the document)
+        const finalBanks = selectedBanks;
 
         const updatedInvoice: Invoice = {
           id: editModeId,
@@ -447,7 +452,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     setDiscountValue(0);
         setDate(new Date().toISOString().split("T")[0]);
         setDueDate("");
-        setSelectedBankIds([]);
+        setSelectedBankIds(banks.filter(b => b.isDefault).map(b => b.id));
         setSaveToClientDb(false);
         setTermsAndConditions("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
       }

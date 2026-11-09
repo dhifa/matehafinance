@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { collection, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc } from "../lib/firestore";
 import { db, sanitizeForFirestore } from "../utils/backend";
 import { Quotation, QuotationItem, Bank, Client, formatRupiah } from "../types";
@@ -74,6 +74,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [editItemDraft, setEditItemDraft] = useState<LineItemDraft>(emptyLineItem());
 
+  const defaultBanksApplied = useRef(false);
+
   useEffect(() => {
     const qQuo = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
     const unsubQuo = onSnapshot(qQuo, (snapshot) => {
@@ -87,9 +89,12 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
       const bks: Bank[] = [];
       snapshot.forEach((doc) => bks.push({ id: doc.id, ...doc.data() } as Bank));
       setBanks(bks);
-      if (bks.length > 0 && selectedBankIds.length === 0) {
+      // Pre-select the default banks once, when the bank list first arrives. Later
+      // snapshots (CI4 polls every few seconds) must not undo the user's choice.
+      if (!defaultBanksApplied.current && bks.length > 0) {
+        defaultBanksApplied.current = true;
         const defaults = bks.filter(b => b.isDefault).map(b => b.id);
-        if (defaults.length > 0) setSelectedBankIds(defaults);
+        setSelectedBankIds(prev => (prev.length === 0 ? defaults : prev));
       }
     });
 
@@ -206,7 +211,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
     try {
       if (editModeId) {
         const existingQuo = quotations.find(q => q.id === editModeId);
-        const finalBanks = selectedBanks.length > 0 ? selectedBanks : (existingQuo?.selectedBanks || []);
+        // Exactly the banks ticked in the form (none ticked = no bank on the document)
+        const finalBanks = selectedBanks;
 
         const updatedQuotation: Quotation = {
           id: editModeId,
@@ -321,7 +327,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
         setItems([]);
         setDate(new Date().toISOString().split("T")[0]);
         setValidUntil("");
-        setSelectedBankIds([]);
+        setSelectedBankIds(banks.filter(b => b.isDefault).map(b => b.id));
         setSaveToClientDb(false);
         setTermsAndConditions("Penawaran ini berlaku selama 14 hari kerja sejak diterbitkan.");
         setShowClientApproval(false);
@@ -367,7 +373,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
     setDiscountValue(0);
     setDate(new Date().toISOString().split("T")[0]);
     setValidUntil("");
-    setSelectedBankIds([]);
+    setSelectedBankIds(banks.filter(b => b.isDefault).map(b => b.id));
     setTermsAndConditions("Penawaran ini berlaku selama 14 hari kerja sejak diterbitkan.");
     setShowClientApproval(false);
     setClientApprovalName("");
