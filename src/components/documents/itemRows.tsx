@@ -1,6 +1,6 @@
 import React from "react";
 import { InvoiceItem, formatRupiah } from "../../types";
-import { formatQty, formatTime, mainAmount, subItemAmount } from "../../utils/lineItems";
+import { formatQty, formatTime, mainAmount, priceOrFree, subItemAmount } from "../../utils/lineItems";
 import { ItemRow } from "./DocumentPrimitives";
 import { FlowUnit } from "./PaginatedDocument";
 
@@ -23,8 +23,8 @@ export function itemRowUnits(items: InvoiceItem[], showTime: boolean): FlowUnit[
             qty={formatQty(item.qty, item.unit)}
             time={formatTime(item.days, item.timeUnit)}
             showTime={showTime}
-            price={item.price > 0 ? formatRupiah(item.price) : ""}
-            total={formatRupiah(hasDetails ? mainAmount(item) : item.total)}
+            price={priceOrFree(item.price)}
+            total={priceOrFree(hasDetails ? mainAmount(item) : item.total)}
           />
         ),
       },

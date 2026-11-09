@@ -1,4 +1,4 @@
-import { InvoiceItem, LineSubItem } from "../types";
+import { InvoiceItem, LineSubItem, formatRupiah } from "../types";
 
 /**
  * Invoice/quotation line items: Qty (+ unit) × Time (+ unit) × unit price, plus
@@ -49,6 +49,9 @@ export const subItemAmount = (sub: { qty?: number; price?: number }) =>
 
 export const lineItemTotal = (item: { qty?: number; days?: number; price?: number; subItems?: { qty?: number; price?: number }[] }) =>
   mainAmount(item) + (item.subItems || []).reduce((s, sub) => s + subItemAmount(sub), 0);
+
+/** Item price or amount for display: Rp 0 is shown as "FREE". */
+export const priceOrFree = (amount: number | undefined) => ((Number(amount) || 0) > 0 ? formatRupiah(Number(amount)) : "FREE");
 
 export const formatQty = (qty: number | undefined, unit?: string) =>
   `${Number(qty) || 1}${unit?.trim() ? ` ${unit.trim()}` : ""}`;
@@ -117,11 +120,11 @@ export const newItemId = newId;
 /** One-line summary used in WhatsApp texts. */
 export function itemSummaryText(item: InvoiceItem, formatRupiah: (n: number) => string): string {
   const time = (Number(item.days) || 1) > 1 || item.timeUnit ? ` × ${formatTime(item.days, item.timeUnit)}` : "";
-  const lines = [`   ${formatQty(item.qty, item.unit)}${time} @ ${formatRupiah(item.price)}`];
+  const lines = [`   ${formatQty(item.qty, item.unit)}${time} @ ${(Number(item.price) || 0) > 0 ? formatRupiah(item.price) : "FREE"}`];
   for (const sub of item.subItems || []) {
     const cost = subItemAmount(sub);
     lines.push(`   - ${sub.description} (${formatQty(sub.qty, sub.unit)})${cost ? ` + ${formatRupiah(cost)}` : ""}`);
   }
-  lines.push(`   Subtotal: *${formatRupiah(item.total)}*`);
+  lines.push(`   Subtotal: *${(Number(item.total) || 0) > 0 ? formatRupiah(item.total) : "FREE"}*`);
   return lines.join("\n");
 }

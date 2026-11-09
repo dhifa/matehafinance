@@ -14,7 +14,7 @@ import { notify } from "../utils/notification";
 import LineItemFields from "./LineItemFields";
 import DiscountFields from "./DiscountFields";
 import { DiscountType, computeDiscount, discountFields } from "../utils/discount";
-import { LineItemDraft, draftFromItem, emptyLineItem, formatQty, formatTime, mainAmount, newItemId, normalizeItem, subItemAmount, validateLineItem } from "../utils/lineItems";
+import { LineItemDraft, draftFromItem, emptyLineItem, formatQty, formatTime, mainAmount, newItemId, priceOrFree, normalizeItem, subItemAmount, validateLineItem } from "../utils/lineItems";
 
 interface QuotationViewProps {
   onNotify?: (text: string, type?: "success" | "error" | "warning" | "info", title?: string) => void;
@@ -893,8 +893,8 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
                           {item.description}
                         </div>
                         <div className="text-[11px] text-slate-400">
-                          <strong className="text-slate-300">{formatQty(item.qty, item.unit)}</strong>{((item.days || 1) > 1 || item.timeUnit) && <> × <strong className="text-slate-300">{formatTime(item.days, item.timeUnit)}</strong></>} @ <span className="font-mono">{formatRupiah(item.price)}</span>
-                          {(item.subItems?.length ?? 0) > 0 && <span className="text-slate-500"> = {formatRupiah(mainAmount(item))}</span>}
+                          <strong className="text-slate-300">{formatQty(item.qty, item.unit)}</strong>{((item.days || 1) > 1 || item.timeUnit) && <> × <strong className="text-slate-300">{formatTime(item.days, item.timeUnit)}</strong></>} @ <span className="font-mono">{priceOrFree(item.price)}</span>
+                          {(item.subItems?.length ?? 0) > 0 && <span className="text-slate-500"> = {priceOrFree(mainAmount(item))}</span>}
                         </div>
                         {(item.subItems || []).map((sub) => (
                           <div key={sub.id} className="flex justify-between gap-3 pl-3 text-[11px] text-slate-400 border-l border-slate-700">
@@ -907,7 +907,7 @@ export default function QuotationView({ onNotify }: QuotationViewProps = {}) {
 
                     <div className="flex items-center justify-between sm:justify-end gap-3 self-end sm:self-center shrink-0 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
                       <span className="font-bold text-cyan-400 font-mono text-sm">
-                        {formatRupiah(item.total)}
+                        {priceOrFree(item.total)}
                       </span>
 
                       <div className="flex items-center gap-1">

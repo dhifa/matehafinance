@@ -290,6 +290,8 @@ const ITEM_COLUMNS = "30px 1fr 76px 112px 122px";
 const ITEM_COLUMNS_WITH_TIME = "30px 1fr 76px 70px 104px 114px";
 
 const cellBase: Style = { padding: "9px 10px", boxSizing: "border-box" };
+// Items priced at Rp 0 read "FREE" in the price/amount cells
+const freeStyle: Style = { color: COLORS.accent, fontWeight: 800, letterSpacing: "0.04em" };
 // Qty/time cells hold short "12 m" / "2 hari" texts; narrower padding keeps them on one line
 const unitCell: Style = { textAlign: "center", paddingLeft: 4, paddingRight: 4 };
 
@@ -394,7 +396,7 @@ export function ItemRow({
       )}
       <div style={{ ...cellBase, ...detail, ...unitCell, fontWeight: isDetail ? 400 : 600 }}>{qty}</div>
       {showTime && <div style={{ ...cellBase, ...detail, ...unitCell, fontWeight: 600 }}>{time ?? ""}</div>}
-      <div style={{ ...cellBase, ...detail, textAlign: "right", whiteSpace: "nowrap" }}>{price}</div>
+      <div style={{ ...cellBase, ...detail, textAlign: "right", whiteSpace: "nowrap", ...(price === "FREE" ? freeStyle : {}) }}>{price}</div>
       <div
         style={{
           ...cellBase,
@@ -403,6 +405,7 @@ export function ItemRow({
           whiteSpace: "nowrap",
           fontWeight: 700,
           color: isDetail ? COLORS.text : COLORS.ink,
+          ...(total === "FREE" ? freeStyle : {}),
         }}
       >
         {total}
