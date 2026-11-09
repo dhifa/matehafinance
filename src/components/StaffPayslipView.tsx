@@ -66,6 +66,8 @@ interface StaffPayslipViewProps {
   projects: EventProject[];
   currentUserProfile: UserProfile;
   onNotify: (text: string, type?: "success" | "info" | "error") => void;
+  /** Period to open first (e.g. from a payslip link sent on WhatsApp) */
+  initialPeriod?: { month: number; year: number };
 }
 
 const INDONESIAN_MONTH_NAMES = [
@@ -94,14 +96,15 @@ export interface ReimbursementRecord {
 export default function StaffPayslipView({
   projects,
   currentUserProfile,
-  onNotify
+  onNotify,
+  initialPeriod
 }: StaffPayslipViewProps) {
   const isAdmin = currentUserProfile.role === "admin";
   const today = new Date();
 
   // Period filters
-  const [selectedMonth, setSelectedMonth] = useState<number>(today.getMonth());
-  const [selectedYear, setSelectedYear] = useState<number>(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(initialPeriod?.month ?? today.getMonth());
+  const [selectedYear, setSelectedYear] = useState<number>(initialPeriod?.year ?? today.getFullYear());
 
   // Sub-tabs: 1. Pendapatan bulan ini, 2. Reimburse (Point B Realisasi), 3. Kasbon
   const [activeSubTab, setActiveSubTab] = useState<"pendapatan" | "reimburse" | "kasbon">("pendapatan");

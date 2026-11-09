@@ -6,12 +6,12 @@ namespace App\Libraries;
  * Builds a MySQL dump (structure + data) of the app's database, restorable
  * with phpMyAdmin "Import" or `mysql nama_database < file.sql`.
  *
- * Login sessions (auth_tokens) and secrets (app_secrets: the Gemini API key)
- * are left out on purpose.
+ * Login sessions (auth_tokens), secrets (app_secrets: API keys) and payslip
+ * link tokens (payslip_links) are left out on purpose.
  */
 class SqlExporter
 {
-    public const EXCLUDED_TABLES = ['auth_tokens', 'app_secrets'];
+    public const EXCLUDED_TABLES = ['auth_tokens', 'app_secrets', 'payslip_links'];
     private const ROWS_PER_INSERT = 100;
 
     /**

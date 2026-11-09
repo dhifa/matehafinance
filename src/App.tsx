@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { apiFetch as aiFetch } from "./lib/api";
 import {
     EventProject,
     INITIAL_PROJECTS,
@@ -66,12 +67,15 @@ import {
   Banknote,
   UserCog,
   BookUser,
-  FileSignature
+  FileSignature,
+  Megaphone,
 } from "lucide-react";
 import UserManagement from "./components/UserManagement";
 import BackupExport from "./components/BackupExport";
 import DatabaseTools from "./components/DatabaseTools";
 import AiSettingsCard from "./components/AiSettingsCard";
+import WaSettingsCard from "./components/WaSettingsCard";
+import EventBlastModal from "./components/EventBlastModal";
 import AiAssistant, { AiEventDraft } from "./components/AiAssistant";
 import StaffPayslipView from "./components/StaffPayslipView";
 import ChangePasswordModal from "./components/ChangePasswordModal";
@@ -582,6 +586,26 @@ export default function App() {
     setActiveTab(availableTabs.some((t) => t.id === preferred) ? preferred : availableTabs[0].id);
   }, [user, userProfile, availableTabs, sharedProjectId]);
 
+  // Payslip link from WhatsApp (?slip=<token>): after login, open the payslip page on the
+  // linked period. The server checks the token belongs to this account.
+  const [slipToken] = useState<string | null>(() => new URLSearchParams(window.location.search).get("slip"));
+  const [slipPeriod, setSlipPeriod] = useState<{ month: number; year: number } | null>(null);
+  const slipHandled = React.useRef(false);
+  const [showEventBlast, setShowEventBlast] = useState(false);
+  useEffect(() => {
+    if (!slipToken || !user || !userProfile || slipHandled.current) return;
+    slipHandled.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("slip");
+    window.history.replaceState(null, "", url.toString());
+    aiFetch<{ month: number; year: number }>(`/wa/payslip-link/${encodeURIComponent(slipToken)}`)
+      .then((p) => {
+        setSlipPeriod({ month: p.month, year: p.year });
+        setActiveTab("staff-payslips");
+      })
+      .catch((err) => triggerNotification(err?.message || "Link slip gaji tidak bisa dibuka.", "error"));
+  }, [slipToken, user, userProfile]);
+
   // Keep user inside valid tabs according to role permissions
   useEffect(() => {
     if (availableTabs.length > 0 && !availableTabs.some((t) => t.id === activeTab)) {
@@ -1022,7 +1046,7 @@ export default function App() {
 
   // Update active project info
   const handleUpdateProjectInfo = async (
-    field: "name" | "date" | "location" | "paymentStatus" | "dpAmount" | "picBonusStaff",
+    field: "name" | "date" | "location" | "paymentStatus" | "dpAmount" | "picBonusStaff" | "callTime" | "picName" | "mapsUrl" | "rundownUrl" | "crewNotes",
     value: any
   ) => {
     if (!activeProject) return;
@@ -1619,6 +1643,58 @@ _Sistem Keuangan Otomatis Mateha Production_`;
               </div>
             </div>
 
+            {/* CREW INFO (used by the WhatsApp event blast) */}
+            {userProfile?.role !== "staff" && (
+              <div className="bg-slate-900/40 border border-slate-800/80 p-4 sm:p-5 rounded-2xl space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Info Kru (untuk Blast WhatsApp)</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowEventBlast(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold cursor-pointer"
+                  >
+                    <Megaphone className="w-3.5 h-3.5" /> Blast WA ke Kru
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  {([
+                    ["callTime", "Call Time", "mis. 06:00"],
+                    ["picName", "PIC Lapangan", "mis. Dhifa (0812...)"],
+                    ["mapsUrl", "Link Google Maps", "https://maps.app.goo.gl/..."],
+                    ["rundownUrl", "Link Rundown / Catatan", "https://..."],
+                  ] as const).map(([field, label, placeholder]) => (
+                    <div key={field}>
+                      <label className="block text-slate-400 font-bold mb-1 uppercase tracking-wider text-[9px] font-mono">{label}</label>
+                      <input
+                        type="text"
+                        value={activeProject[field] || ""}
+                        placeholder={placeholder}
+                        onChange={(e) => handleUpdateProjectInfo(field, e.target.value)}
+                        className="w-full bg-slate-950/60 border border-slate-800/80 rounded-xl py-2 px-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs">
+                  <label className="block text-slate-400 font-bold mb-1 uppercase tracking-wider text-[9px] font-mono">Catatan untuk Kru</label>
+                  <input
+                    type="text"
+                    value={activeProject.crewNotes || ""}
+                    placeholder="mis. Dresscode hitam, bawa ID card"
+                    onChange={(e) => handleUpdateProjectInfo("crewNotes", e.target.value)}
+                    className="w-full bg-slate-950/60 border border-slate-800/80 rounded-xl py-2 px-3 text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                  />
+                </div>
+              </div>
+            )}
+            {showEventBlast && (
+              <EventBlastModal
+                event={activeProject}
+                canSaveTemplates={(userProfile?.role || "").toLowerCase() === "admin"}
+                onClose={() => setShowEventBlast(false)}
+              />
+            )}
+
             {/* SIDE-BY-SIDE GRIDS */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
               
@@ -1717,6 +1793,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
             {!!userProfile && <DashboardStats projects={projects} />}
             {!!userProfile && <FinancialChart projects={projects} />}
             {!!userProfile && userProfile.role === "admin" && <AiSettingsCard />}
+            {!!userProfile && userProfile.role === "admin" && <WaSettingsCard />}
             {!!userProfile && userProfile.role === "admin" && <BackupExport />}
             {!!userProfile && userProfile.role === "admin" && <DatabaseTools />}
             
@@ -2032,11 +2109,14 @@ _Sistem Keuangan Otomatis Mateha Production_`;
 
         {/* ==================== TAB VIEW 3.5: STAFF PAYSLIP & KASBON WORKSPACE (STAFF & ADMIN) ==================== */}
         {activeTab === "staff-payslips" && !!userProfile && (
-          <StaffPayslipView
-            projects={projects}
-            currentUserProfile={userProfile}
-            onNotify={(msg, type) => triggerNotification(msg, type === "error" ? "error" : "success")}
-          />
+          <React.Fragment key={slipPeriod ? `${slipPeriod.year}-${slipPeriod.month}` : "default"}>
+            <StaffPayslipView
+              initialPeriod={slipPeriod || undefined}
+              projects={projects}
+              currentUserProfile={userProfile}
+              onNotify={(msg, type) => triggerNotification(msg, type === "error" ? "error" : "success")}
+            />
+          </React.Fragment>
         )}
 
         {/* ==================== TAB VIEW 4: USER / STAFF MANAGEMENT WORKSPACE ==================== */}

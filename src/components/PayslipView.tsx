@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import logo from "/favicon.png";
 import PayslipBlastModal from "./PayslipBlastModal";
+import PayslipWaModal from "./PayslipWaModal";
 import ttd from "../../assets/ttd.png";
 import { formatMultiDates, parseIndonesianDateText } from "../utils/date";
 import { saveAs } from "file-saver";
@@ -108,6 +109,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
   const [loadingKasbon, setLoadingKasbon] = useState(true);
   const [kasbonStatusFilter, setKasbonStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [showBlast, setShowBlast] = useState(false);
+  const [showWaSend, setShowWaSend] = useState(false);
   const [kasbonTypeFilter, setKasbonTypeFilter] = useState<"all" | "kasbon" | "salary">("all");
   const [kasbonSearchQuery, setKasbonSearchQuery] = useState<string>("");
   const [copiedKasbonId, setCopiedKasbonId] = useState<string | null>(null);
@@ -874,6 +876,16 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
               <MessageCircle className="w-3.5 h-3.5 text-slate-950" />
               <span>Blast WhatsApp</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setShowWaSend(true)}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-850 text-emerald-300 border border-emerald-500/40 font-extrabold rounded-xl text-xs transition cursor-pointer"
+              title="Kirim link slip gaji ke WhatsApp masing-masing staf"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Kirim Slip via WA</span>
+            </button>
           </div>
         </div>
 
@@ -1584,6 +1596,8 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
           )}
         </div>
       )}
+
+      {showWaSend && <PayslipWaModal month={selectedMonth} year={selectedYear} onClose={() => setShowWaSend(false)} />}
 
       {showBlast && (
         <PayslipBlastModal

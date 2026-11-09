@@ -19,6 +19,16 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => ['cors'
     $routes->post('admin/import-json', 'AdminData::importJson');
     $routes->get('admin/export-sql', 'AdminData::exportSql');
 
+    $routes->get('wa/settings', 'WhatsApp::settings');
+    $routes->put('wa/settings', 'WhatsApp::saveSettings');
+    $routes->delete('wa/settings', 'WhatsApp::deleteSettings');
+    $routes->post('wa/settings/test', 'WhatsApp::testSettings');
+    $routes->post('wa/payslips/list', 'WhatsApp::payslipList');
+    $routes->post('wa/payslips/send', 'WhatsApp::payslipSend');
+    $routes->get('wa/payslip-link/(:segment)', 'WhatsApp::payslipLink/$1');
+    $routes->get('wa/staff', 'WhatsApp::staff');
+    $routes->post('wa/events/send', 'WhatsApp::eventSend');
+
     $routes->post('gemini/parse-rab', 'Gemini::parseRab');
     $routes->post('gemini/parse-receipt', 'Gemini::parseReceipt');
     $routes->post('ai/assistant', 'AiAssistant::chat');

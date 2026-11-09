@@ -68,6 +68,29 @@ nonaktifkan, hapus) atau minta AI "lupakan aturan …".
 
 Endpoint: `POST /api/ai/assistant`, `GET/POST /api/ai/memories`, `PATCH/DELETE /api/ai/memories/{id}`.
 
+## WhatsApp (Atlantic-Notify)
+
+Admin mengisi **API key**, **Device ID**, dan **Nomor Tes** di *Dashboard & Data* → **Pengaturan WhatsApp**, lalu
+klik **Tes Koneksi**. Key disimpan di server dan tidak pernah dikirim utuh ke browser. Nomor WA staf diambil dari
+kolom **No. HP** di Manajemen Staff.
+
+**Kirim Slip Gaji via WA** (Slip Gaji Staff, admin/finance):
+- Penerima = staf yang slip periode itu sudah **Rilis**; staf, nomor, dan slip dicocokkan di server.
+- Setiap staf menerima link `…/?slip=<token>` (token acak, berlaku 30 hari) ke slip **miliknya sendiri**; slip baru
+  terbuka setelah login, dan server menolak link milik orang lain. Pesan tidak memuat nominal.
+- Alur: *Kirim tes ke saya* → ketik **KIRIM** → kirim bertahap (5 staf per permintaan). Status per staf:
+  belum / terkirim / gagal + alasan; **Kirim ulang yang gagal** hanya mengirim ke yang gagal.
+- Log (`wa_logs`) hanya berisi waktu, staf, periode, status, dan alasan gagal; tanpa nominal.
+
+**Blast WA ke Kru** (Lembar Kerja → Info Kru, admin/finance): isi Call Time, PIC, link Google Maps, link rundown,
+dan catatan; pilih jenis pesan (Info / Perubahan Jadwal / Pembatalan), penerima (semua staf aktif, per peran, atau
+manual), lalu kirim. Template bisa diedit dengan variabel `{nama} {acara} {tanggal} {call_time} {lokasi} {maps}
+{pic} {rundown} {catatan}` dan disimpan admin.
+
+Untuk pengujian, `WA_API_BASE_URL` bisa diarahkan ke server tiruan (default `https://atlantic-notify.com/api/v1`).
+
+Setelah update, jalankan `php spark migrate` (membuat tabel `wa_payslip_status`, `payslip_links`, `wa_logs`).
+
 ## Pindah data dari Firestore (import JSON)
 
 1. Di aplikasi versi Firestore (finance.mateha.co.id), login sebagai admin → *Dashboard & Data* →

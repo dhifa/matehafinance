@@ -146,6 +146,12 @@ export interface EventProject {
   isPointBClosed?: boolean;
   paymentStatus?: "belum" | "dp" | "lunas";
   dpAmount?: number;
+  // Crew info, used by the WhatsApp event blast
+  callTime?: string; // e.g. "06:00"
+  picName?: string;
+  mapsUrl?: string;
+  rundownUrl?: string;
+  crewNotes?: string;
 }
 
 // Global financial status of Mateha
