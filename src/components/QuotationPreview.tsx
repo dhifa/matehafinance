@@ -5,8 +5,9 @@ import { saveAs } from "file-saver";
 import { notify } from "../utils/notification";
 import { formatDateString } from "../utils/date";
 import { terbilang } from "../utils/numberToWords";
-import { Download, Printer, FileText, Loader2, Copy, Check, UserCheck, Trash2 } from "lucide-react";
+import { Download, Printer, FileText, Loader2, UserCheck, Trash2, MessageCircle } from "lucide-react";
 import QuotationDocument from "./documents/QuotationDocument";
+import SendWhatsAppModal from "./documents/SendWhatsAppModal";
 import DocumentPreviewShell, { primaryToolbarButton, toolbarButton } from "./documents/DocumentPreviewShell";
 import { itemSummaryText } from "../utils/lineItems";
 import { discountLabel } from "../utils/discount";
@@ -21,7 +22,7 @@ export default function QuotationPreview({
   onDelete?: (quotation: Quotation) => void;
 }) {
   const [busy, setBusy] = useState<"download" | "print" | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [showWa, setShowWa] = useState(false);
   const [pageCount, setPageCount] = useState<number>();
   const [showClientApproval, setShowClientApproval] = useState<boolean>(!!quotation.showClientApproval);
 
@@ -48,7 +49,7 @@ export default function QuotationPreview({
     }
   };
 
-  const copySummaryForWA = () => {
+  const buildWaText = () => {
     let itemsText = quotation.items.map((item, idx) => {
       return `${idx + 1}. *${item.description.replace(/\n/g, ' ')}*\n${itemSummaryText(item, formatRupiah)}`;
     }).join('\n');
@@ -74,74 +75,74 @@ export default function QuotationPreview({
       `*Syarat & Ketentuan:*\n${quotation.termsAndConditions || 'Penawaran berlaku selama 14 hari sejak diterbitkan.'}\n\n` +
       `Terima kasih,\n*Mateha Production* (Hotline: +62 811-1244-7701)`;
 
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
+    return text;
   };
 
   return (
-    <DocumentPreviewShell
-      icon={<FileText className="w-5 h-5" />}
-      title="Pratinjau Penawaran Harga"
-      badge="Quotation"
-      reference={quotation.quotationNumber}
-      pageCount={pageCount}
-      onClose={onClose}
-      actions={
-        <>
-          <button
-            onClick={() => setShowClientApproval(!showClientApproval)}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
-              showClientApproval
-                ? "bg-cyan-950/90 border-cyan-500/80 text-cyan-300"
-                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400"
-            }`}
-            title="Tampilkan atau sembunyikan kolom tanda tangan klien"
-          >
-            <UserCheck className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Approval Klien:</span>
-            <span>{showClientApproval ? "ON" : "OFF"}</span>
-          </button>
-
-          <button onClick={copySummaryForWA} className={toolbarButton} title="Salin ringkasan teks untuk WhatsApp">
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-bold">Tersalin!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden sm:inline">Salin WA</span>
-              </>
-            )}
-          </button>
-
-          <button onClick={() => runExport("print")} disabled={busy !== null} className={toolbarButton} title="Cetak dokumen">
-            {busy === "print" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5 text-slate-400" />}
-            <span className="hidden sm:inline">Cetak</span>
-          </button>
-
-          <button onClick={() => runExport("download")} disabled={busy !== null} className={primaryToolbarButton}>
-            {busy === "download" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            <span>{busy === "download" ? "Memproses..." : "Unduh PDF"}</span>
-          </button>
-
-          {onDelete && (
+    <>
+      <DocumentPreviewShell
+        icon={<FileText className="w-5 h-5" />}
+        title="Pratinjau Penawaran Harga"
+        badge="Quotation"
+        reference={quotation.quotationNumber}
+        pageCount={pageCount}
+        onClose={onClose}
+        actions={
+          <>
             <button
-              onClick={() => onDelete(quotation)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-950 border border-slate-700 hover:border-rose-700 text-slate-400 hover:text-rose-400 text-xs font-semibold transition cursor-pointer"
-              title="Hapus Quotation Ini"
+              onClick={() => setShowClientApproval(!showClientApproval)}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                showClientApproval
+                  ? "bg-cyan-950/90 border-cyan-500/80 text-cyan-300"
+                  : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400"
+              }`}
+              title="Tampilkan atau sembunyikan kolom tanda tangan klien"
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              <span className="hidden sm:inline">Hapus</span>
+              <UserCheck className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Approval Klien:</span>
+              <span>{showClientApproval ? "ON" : "OFF"}</span>
             </button>
-          )}
-        </>
-      }
-    >
-      <QuotationDocument quotation={activeQuotation} onPageCount={setPageCount} />
-    </DocumentPreviewShell>
+
+            <button onClick={() => setShowWa(true)} className={toolbarButton} title="Kirim ke klien lewat WhatsApp">
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </button>
+
+            <button onClick={() => runExport("print")} disabled={busy !== null} className={toolbarButton} title="Cetak dokumen">
+              {busy === "print" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5 text-slate-400" />}
+              <span className="hidden sm:inline">Cetak</span>
+            </button>
+
+            <button onClick={() => runExport("download")} disabled={busy !== null} className={primaryToolbarButton}>
+              {busy === "download" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              <span>{busy === "download" ? "Memproses..." : "Unduh PDF"}</span>
+            </button>
+
+            {onDelete && (
+              <button
+                onClick={() => onDelete(quotation)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-950 border border-slate-700 hover:border-rose-700 text-slate-400 hover:text-rose-400 text-xs font-semibold transition cursor-pointer"
+                title="Hapus Quotation Ini"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">Hapus</span>
+              </button>
+            )}
+          </>
+        }
+      >
+        <QuotationDocument quotation={activeQuotation} onPageCount={setPageCount} />
+      </DocumentPreviewShell>
+      {showWa && (
+        <SendWhatsAppModal
+          title="Kirim Quotation via WhatsApp"
+          phone={quotation.customerPhone}
+          initialText={buildWaText()}
+          fileName={pdfFileName("Quotation", quotation.quotationNumber, quotation.customerName)}
+          buildPdf={() => generateQuotationPdfBlob(activeQuotation)}
+          onClose={() => setShowWa(false)}
+        />
+      )}
+    </>
   );
 }
