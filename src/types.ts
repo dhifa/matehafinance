@@ -9,7 +9,8 @@ export type TabType =
   | "clients"
   | "payslips"
   | "staff-payslips"
-  | "users";
+  | "users"
+  | "broadcast";
 
 export interface BudgetItem {
   id: string;

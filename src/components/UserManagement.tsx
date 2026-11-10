@@ -69,6 +69,7 @@ export const ALL_SYSTEM_FEATURES: RoleFeatureItem[] = [
   // Administrasi & Master
   { id: "staff-payslips", label: "Staff Payslip & Kasbon", shortLabel: "Staff Payslip", description: "Slip gaji staf & pengajuan kasbon operasional", category: "Administrasi & Master", icon: Wallet },
   { id: "payslips", label: "Slip Gaji Staff (Admin)", shortLabel: "Slip Gaji", description: "Perhitungan kalkulasi gaji seluruh tim Mateha", category: "Administrasi & Master", icon: FileText },
+  { id: "broadcast", label: "Broadcast WhatsApp", shortLabel: "Broadcast WA", description: "Kirim pesan WhatsApp custom ke tim (per peran atau manual)", category: "Administrasi & Master", icon: Users },
   { id: "users", label: "Manajemen Staff & Peran", shortLabel: "Manajemen Staff", description: "Kelola akun anggota tim & kustomisasi hak peran", category: "Administrasi & Master", icon: Users },
 ];
 
@@ -82,7 +83,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRole[] = [
     allowedTabs: [
       "sheets", "staff-payslips", "dashboard", "finance", 
       "invoice", "quotation", "kwitansi", "clients", 
-      "payslips", "users"
+      "payslips", "users", "broadcast"
     ]
   },
   { 
@@ -91,7 +92,7 @@ const DEFAULT_SYSTEM_ROLES: CustomRole[] = [
     description: "Khusus kelola Invoice, Quotation, Kwitansi, dan Database Klien", 
     isSystem: true, 
     color: "emerald",
-    allowedTabs: ["invoice", "quotation", "kwitansi", "clients"]
+    allowedTabs: ["invoice", "quotation", "kwitansi", "clients", "broadcast"]
   },
   { 
     id: "staff", 

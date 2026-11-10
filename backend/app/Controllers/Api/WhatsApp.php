@@ -341,6 +341,68 @@ class WhatsApp extends BaseApiController
         return $this->ok(['results' => $results]);
     }
 
+    /** POST {message, recipients: uid[] (max 5), mode: test|send} — {nama} {peran} {pengirim} filled per person. */
+    public function broadcastSend(): ResponseInterface
+    {
+        if (! Auth::isFinanceOrAdmin()) {
+            return $this->denied();
+        }
+        $body    = $this->body();
+        $message = trim((string) ($body['message'] ?? ''));
+        $mode    = (string) ($body['mode'] ?? 'send');
+        $uids    = array_values(array_filter(array_map('strval', is_array($body['recipients'] ?? null) ? $body['recipients'] : []), static fn ($u) => preg_match('/^[A-Za-z0-9_-]{1,128}$/', $u)));
+        if ($message === '' || mb_strlen($message) > 3000) {
+            return $this->fail(400, 'invalid-argument', 'Isi pesan kosong atau terlalu panjang (maks. 3000 karakter).');
+        }
+        if ($mode === 'send' && ($uids === [] || count($uids) > self::BATCH_SIZE)) {
+            return $this->fail(400, 'invalid-argument', 'Kirim 1–' . self::BATCH_SIZE . ' penerima per permintaan.');
+        }
+        $cfg = AtlanticNotify::config();
+        if (! AtlanticNotify::isConfigured($cfg)) {
+            return $this->notConfigured();
+        }
+        $store  = new DocumentStore();
+        $user   = Auth::user();
+        $me     = $store->get('users', $user['uid']) ?? [];
+        $sender = (string) (($me['displayName'] ?? '') ?: $user['username']);
+        $vars   = static fn (string $name, string $role) => ['nama' => $name, 'peran' => $role, 'pengirim' => $sender];
+        $ref    = mb_substr(preg_replace('/\s+/', ' ', $message), 0, 60);
+
+        if ($mode === 'test') {
+            if ($cfg['testNumber'] === '') {
+                return $this->fail(400, 'failed-precondition', 'Isi Nomor Tes di Pengaturan WhatsApp terlebih dahulu.');
+            }
+            $sent = AtlanticNotify::sendText($cfg, $cfg['testNumber'], "🧪 *PESAN TES*\n\n" . self::render($message, $vars($sender, $user['role'] ?: 'admin')));
+            $this->log('broadcast-test', $ref, $user['uid'], $sender, $sent);
+
+            return $sent['ok']
+                ? $this->ok(['ok' => true, 'message' => 'Pesan tes terkirim ke ' . AtlanticNotify::maskPhone($cfg['testNumber']) . '.'])
+                : $this->fail(502, 'send-failed', 'Pesan tes gagal: ' . $sent['reason']);
+        }
+
+        // Phone numbers come from the database, never from the browser
+        $results = [];
+        foreach ($uids as $i => $uid) {
+            $u     = $store->get('users', $uid);
+            $name  = (string) (($u['displayName'] ?? '') ?: ($u['username'] ?? $uid));
+            $phone = AtlanticNotify::normalizePhone($u['phone'] ?? '');
+            if ($u === null) {
+                $result = ['ok' => false, 'reason' => 'Akun tidak ditemukan.'];
+            } elseif ($phone === '') {
+                $result = ['ok' => false, 'reason' => 'Nomor WA belum diisi di Manajemen Staff.'];
+            } else {
+                if ($i > 0) {
+                    usleep(self::SEND_GAP_US);
+                }
+                $result = AtlanticNotify::sendText($cfg, $phone, self::render($message, $vars($name, strtolower((string) ($u['role'] ?? 'staff')))));
+            }
+            $this->log('broadcast', $ref, $uid, $name, $result);
+            $results[] = ['uid' => $uid, 'name' => $name, 'status' => $result['ok'] ? 'terkirim' : 'gagal', 'reason' => $result['reason'] ?? null];
+        }
+
+        return $this->ok(['results' => $results]);
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------

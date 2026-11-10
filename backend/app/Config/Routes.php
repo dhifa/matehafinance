@@ -28,6 +28,7 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => ['cors'
     $routes->get('wa/payslip-link/(:segment)', 'WhatsApp::payslipLink/$1');
     $routes->get('wa/staff', 'WhatsApp::staff');
     $routes->post('wa/events/send', 'WhatsApp::eventSend');
+    $routes->post('wa/broadcast/send', 'WhatsApp::broadcastSend');
 
     $routes->post('gemini/parse-rab', 'Gemini::parseRab');
     $routes->post('gemini/parse-receipt', 'Gemini::parseReceipt');

@@ -87,6 +87,10 @@ dan catatan; pilih jenis pesan (Info / Perubahan Jadwal / Pembatalan), penerima 
 manual), lalu kirim. Template bisa diedit dengan variabel `{nama} {acara} {tanggal} {call_time} {lokasi} {maps}
 {pic} {rundown} {catatan}` dan disimpan admin.
 
+**Broadcast WA** (tab sendiri, admin & finance): pesan bebas dengan variabel `{nama} {peran} {pengirim}`, template
+cepat (Pengumuman, Rapat/Briefing, Pengingat Finance), penerima semua akun aktif / per peran (mis. hanya finance) /
+manual, kirim tes ke saya, status per orang, dan kirim ulang yang gagal. Tab ini selalu muncul untuk admin dan finance.
+
 Untuk pengujian, `WA_API_BASE_URL` bisa diarahkan ke server tiruan (default `https://atlantic-notify.com/api/v1`).
 
 Setelah update, jalankan `php spark migrate` (membuat tabel `wa_payslip_status`, `payslip_links`, `wa_logs`).

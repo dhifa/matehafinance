@@ -76,6 +76,7 @@ import DatabaseTools from "./components/DatabaseTools";
 import AiSettingsCard from "./components/AiSettingsCard";
 import WaSettingsCard from "./components/WaSettingsCard";
 import EventBlastModal from "./components/EventBlastModal";
+import BroadcastView from "./components/BroadcastView";
 import AiAssistant, { AiEventDraft } from "./components/AiAssistant";
 import StaffPayslipView from "./components/StaffPayslipView";
 import ChangePasswordModal from "./components/ChangePasswordModal";
@@ -110,6 +111,7 @@ const ALL_NAV_TABS: NavTabItem[] = [
   { id: "clients", label: "Database Klien", shortLabel: "Klien", icon: BookUser, roles: ["admin", "finance"] },
   { id: "payslips", label: "Slip Gaji Staff", shortLabel: "Slip Gaji", icon: Banknote, roles: ["admin"] },
   { id: "users", label: "Manajemen Staff", shortLabel: "Staff", icon: UserCog, roles: ["admin"] },
+  { id: "broadcast", label: "Broadcast WA", shortLabel: "Broadcast", icon: Megaphone, roles: ["admin", "finance"] },
 ];
 
 // Local Storage resilient caching helpers for Firestore offline/quota fallback
@@ -229,18 +231,20 @@ export default function App() {
       const allowed = matchedRole && Array.isArray(matchedRole.allowedTabs) && matchedRole.allowedTabs.length > 0
         ? matchedRole.allowedTabs
         : ALL_NAV_TABS.map((t) => t.id);
-      // Guarantee admin always retains 'users' tab so they can manage permissions & roles
-      const guaranteed = allowed.includes("users") ? allowed : [...allowed, "users" as TabType];
+      // Guarantee admin always retains 'users' (to manage permissions & roles) and 'broadcast'
+      const guaranteed = [...new Set([...allowed, "users" as TabType, "broadcast" as TabType])];
       return ALL_NAV_TABS.filter((t) => guaranteed.includes(t.id));
     }
 
     if (matchedRole && Array.isArray(matchedRole.allowedTabs) && matchedRole.allowedTabs.length > 0) {
-      return ALL_NAV_TABS.filter((t) => matchedRole.allowedTabs!.includes(t.id));
+      // Finance always keeps Broadcast WA (added after roles may already have been customized)
+      const allowed = userRoleKey === "finance" ? [...matchedRole.allowedTabs, "broadcast" as TabType] : matchedRole.allowedTabs;
+      return ALL_NAV_TABS.filter((t) => allowed.includes(t.id));
     }
 
     // Default fallbacks if custom_roles not yet customized
     if (userRoleKey === "finance") {
-      return ALL_NAV_TABS.filter((t) => ["invoice", "quotation", "kwitansi", "clients"].includes(t.id));
+      return ALL_NAV_TABS.filter((t) => ["invoice", "quotation", "kwitansi", "clients", "broadcast"].includes(t.id));
     }
     return ALL_NAV_TABS.filter((t) => ["sheets", "staff-payslips"].includes(t.id));
   }, [userProfile, customRoles]);
@@ -2121,6 +2125,10 @@ _Sistem Keuangan Otomatis Mateha Production_`;
         )}
 
         {/* ==================== TAB VIEW 4: USER / STAFF MANAGEMENT WORKSPACE ==================== */}
+        {activeTab === "broadcast" && !!userProfile && (
+          <BroadcastView currentUserName={userProfile.displayName || userProfile.username} />
+        )}
+
         {activeTab === "users" && !!userProfile && (
           <UserManagement 
             currentUserId={user.uid} 
