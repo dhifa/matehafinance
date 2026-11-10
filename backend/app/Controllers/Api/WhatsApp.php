@@ -358,6 +358,11 @@ class WhatsApp extends BaseApiController
         if ($mode === 'send' && ($uids === [] || count($uids) > self::BATCH_SIZE)) {
             return $this->fail(400, 'invalid-argument', 'Kirim 1–' . self::BATCH_SIZE . ' penerima per permintaan.');
         }
+        // {password} gives every recipient a NEW random password (old one stops working). Admin only.
+        $withPassword = str_contains($message, '{password}');
+        if ($withPassword && ! Auth::isAdmin()) {
+            return $this->fail(403, 'permission-denied', 'Hanya admin yang boleh mengirim password akun.');
+        }
         $cfg = AtlanticNotify::config();
         if (! AtlanticNotify::isConfigured($cfg)) {
             return $this->notConfigured();
@@ -368,14 +373,16 @@ class WhatsApp extends BaseApiController
         $sender = (string) (($me['displayName'] ?? '') ?: $user['username']);
         // Account details for the "Info Akun & Login" template. Passwords are never sent.
         $login  = $this->appOrigin() ?: 'https://financestg.mateha.co.id';
-        $vars   = static fn (string $name, string $role, string $username) => ['nama' => $name, 'peran' => $role, 'pengirim' => $sender, 'username' => $username, 'link_login' => $login];
+        $vars   = static fn (string $name, string $role, string $username, string $password = '(password baru)') => [
+            'nama' => $name, 'peran' => $role, 'pengirim' => $sender, 'username' => $username, 'link_login' => $login, 'password' => $password,
+        ];
         $ref    = mb_substr(preg_replace('/\s+/', ' ', $message), 0, 60);
 
         if ($mode === 'test') {
             if ($cfg['testNumber'] === '') {
                 return $this->fail(400, 'failed-precondition', 'Isi Nomor Tes di Pengaturan WhatsApp terlebih dahulu.');
             }
-            $sent = AtlanticNotify::sendText($cfg, $cfg['testNumber'], "🧪 *PESAN TES*\n\n" . self::render($message, $vars($sender, $user['role'] ?: 'admin', (string) $user['username'])));
+            $sent = AtlanticNotify::sendText($cfg, $cfg['testNumber'], "🧪 *PESAN TES*\n\n" . self::render($message, $vars($sender, $user['role'] ?: 'admin', (string) $user['username'], 'Contoh123 (password tidak diganti saat tes)')));
             $this->log('broadcast-test', $ref, $user['uid'], $sender, $sent);
 
             return $sent['ok']
@@ -393,11 +400,24 @@ class WhatsApp extends BaseApiController
                 $result = ['ok' => false, 'reason' => 'Akun tidak ditemukan.'];
             } elseif ($phone === '') {
                 $result = ['ok' => false, 'reason' => 'Nomor WA belum diisi di Manajemen Staff.'];
+            } elseif ($withPassword && $uid === $user['uid']) {
+                $result = ['ok' => false, 'reason' => 'Akun Anda sendiri dilewati. Ganti password lewat tombol Password.'];
             } else {
                 if ($i > 0) {
                     usleep(self::SEND_GAP_US);
                 }
-                $result = AtlanticNotify::sendText($cfg, $phone, self::render($message, $vars($name, strtolower((string) ($u['role'] ?? 'staff')), (string) (($u['username'] ?? '') ?: '-'))));
+                $password = $withPassword ? self::temporaryPassword() : null;
+                $result   = AtlanticNotify::sendText($cfg, $phone, self::render($message, $vars($name, strtolower((string) ($u['role'] ?? 'staff')), (string) (($u['username'] ?? '') ?: '-'), $password ?? '(password baru)')));
+                // Only change the password once the person has it; a failed send leaves the account untouched
+                if ($result['ok'] && $password !== null) {
+                    try {
+                        db_connect()->table('users')->where('id', $uid)->update(['password_hash' => password_hash($password, PASSWORD_DEFAULT)]);
+                        Auth::revokeAllForUser($uid); // sign out old sessions, same as an admin password reset
+                    } catch (\Throwable $e) {
+                        log_message('error', 'Broadcast password reset failed for {uid}: {msg}', ['uid' => $uid, 'msg' => $e->getMessage()]);
+                        $result = ['ok' => false, 'reason' => 'Pesan terkirim, tapi password belum diganti (gagal menyimpan). Password di pesan itu belum berlaku — kirim ulang.'];
+                    }
+                }
             }
             $this->log('broadcast', $ref, $uid, $name, $result);
             $results[] = ['uid' => $uid, 'name' => $name, 'status' => $result['ok'] ? 'terkirim' : 'gagal', 'reason' => $result['reason'] ?? null];
@@ -409,6 +429,18 @@ class WhatsApp extends BaseApiController
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /** 8 easy-to-read characters (no 0/O, 1/l/I). */
+    private static function temporaryPassword(): string
+    {
+        $alphabet = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $out      = '';
+        for ($i = 0; $i < 8; $i++) {
+            $out .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        return $out;
+    }
 
     /**
      * Staff with a RELEASED payslip for the period, matched to their account by username.

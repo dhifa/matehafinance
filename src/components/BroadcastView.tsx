@@ -5,7 +5,8 @@ import { renderTemplate } from "../utils/waTemplates";
 import WaRecipientPicker, { WaSendStatus, WaStaffMember } from "./WaRecipientPicker";
 
 const BATCH = 5;
-const VARIABLES = ["nama", "peran", "username", "link_login", "pengirim"];
+const VARIABLES = ["nama", "peran", "username", "password", "link_login", "pengirim"];
+const ADMIN_ONLY_TEMPLATE = "Info Akun & Login";
 const QUICK_TEMPLATES: { label: string; text: string }[] = [
   {
     label: "Pengumuman",
@@ -25,7 +26,8 @@ const QUICK_TEMPLATES: { label: string; text: string }[] = [
       "👤 Username: *{username}*",
       "🏷️ Peran: {peran}",
       "🌐 Link login: {link_login}",
-      "🔑 Password: gunakan password yang sudah diberikan admin. Lupa password? Hubungi admin untuk di-reset.",
+      "🔑 Password: *{password}*",
+      "_(Password ini baru dibuat. Password lama tidak berlaku lagi.)_",
       "",
       "*Cara login*",
       "1. Buka {link_login}",
@@ -51,7 +53,7 @@ const QUICK_TEMPLATES: { label: string; text: string }[] = [
  * Free-text WhatsApp broadcast to chosen accounts (everyone, by role such as
  * finance, or a manual pick). Phone numbers are looked up on the server.
  */
-export default function BroadcastView({ currentUserName }: { currentUserName: string }) {
+export default function BroadcastView({ currentUserName, isAdmin }: { currentUserName: string; isAdmin: boolean }) {
   const draftKey = "mateha_wa_broadcast_draft";
   const [message, setMessage] = useState<string>(() => {
     try {
@@ -90,9 +92,13 @@ export default function BroadcastView({ currentUserName }: { currentUserName: st
     peran: first?.role || "staff",
     username: first?.username || "username",
     link_login: window.location.origin,
+    password: "(password baru acak)",
     pengirim: currentUserName,
   });
-  const mentionsPassword = /password|kata sandi/i.test(message);
+  // {password} resets each recipient's password to a new random one on the server (admin only)
+  const withPassword = message.includes("{password}");
+  const templates = isAdmin ? QUICK_TEMPLATES : QUICK_TEMPLATES.filter((t) => t.label !== ADMIN_ONLY_TEMPLATE);
+  const variables = isAdmin ? VARIABLES : VARIABLES.filter((v) => v !== "password");
 
   const sendTest = async () => {
     setBusy("test");
@@ -109,7 +115,10 @@ export default function BroadcastView({ currentUserName }: { currentUserName: st
 
   const send = async (targets: WaStaffMember[]) => {
     if (!targets.length || !message.trim()) return;
-    if (!window.confirm(`Kirim pesan ini ke ${targets.length} orang via WhatsApp?`)) return;
+    const question = withPassword
+      ? `Kirim pesan ini ke ${targets.length} orang?\n\nPASSWORD MEREKA AKAN DIGANTI dengan password baru acak (dikirim di pesan). Password lama tidak berlaku lagi dan mereka akan logout. Hanya diganti bila pesan berhasil terkirim.`
+      : `Kirim pesan ini ke ${targets.length} orang via WhatsApp?`;
+    if (!window.confirm(question)) return;
     setBusy("send");
     setNotice(null);
     setProgress({ done: 0, total: targets.length });
@@ -150,7 +159,7 @@ export default function BroadcastView({ currentUserName }: { currentUserName: st
         <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-slate-500 mr-1">Template cepat:</span>
-            {QUICK_TEMPLATES.map((t) => (
+            {templates.map((t) => (
               <button
                 key={t.label}
                 type="button"
@@ -171,17 +180,19 @@ export default function BroadcastView({ currentUserName }: { currentUserName: st
           />
           <div className="flex flex-wrap items-center gap-1">
             <span className="text-[10px] text-slate-500 mr-1">Variabel:</span>
-            {VARIABLES.map((v) => (
+            {variables.map((v) => (
               <button key={v} type="button" onClick={() => setMessage(`${message}{${v}}`)} className="px-1.5 py-0.5 rounded-md bg-slate-800 text-[10px] font-mono text-cyan-300 hover:bg-slate-700 cursor-pointer">
                 {`{${v}}`}
               </button>
             ))}
             <span className="ml-auto text-[10px] text-slate-500 font-mono">{message.length}/3000</span>
           </div>
-          {mentionsPassword && (
-            <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
-              Demi keamanan, password tidak ikut dikirim. Jangan ketik password siapa pun di pesan broadcast — beri tahu langsung secara pribadi, atau reset
-              passwordnya dulu di Manajemen Staff.
+          {withPassword && (
+            <p className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+              <strong>{"{password}"}</strong> = setiap penerima dibuatkan <strong>password baru acak</strong>. Password lama mereka tidak berlaku lagi dan mereka
+              akan logout. Password hanya diganti bila pesan berhasil terkirim; akun Anda sendiri dilewati. Pesan tes memakai contoh dan tidak mengganti
+              password siapa pun.
+              {!isAdmin && <span className="block mt-1 text-rose-300">Hanya admin yang bisa mengirim password.</span>}
             </p>
           )}
           <div>

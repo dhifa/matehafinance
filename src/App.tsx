@@ -2126,7 +2126,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
 
         {/* ==================== TAB VIEW 4: USER / STAFF MANAGEMENT WORKSPACE ==================== */}
         {activeTab === "broadcast" && !!userProfile && (
-          <BroadcastView currentUserName={userProfile.displayName || userProfile.username} />
+          <BroadcastView currentUserName={userProfile.displayName || userProfile.username} isAdmin={(userProfile.role || "").toLowerCase() === "admin"} />
         )}
 
         {activeTab === "users" && !!userProfile && (
