@@ -5,7 +5,7 @@ import { renderTemplate } from "../utils/waTemplates";
 import WaRecipientPicker, { WaSendStatus, WaStaffMember } from "./WaRecipientPicker";
 
 const BATCH = 5;
-const VARIABLES = ["nama", "peran", "pengirim"];
+const VARIABLES = ["nama", "peran", "username", "link_login", "pengirim"];
 const QUICK_TEMPLATES: { label: string; text: string }[] = [
   {
     label: "Pengumuman",
@@ -14,6 +14,32 @@ const QUICK_TEMPLATES: { label: string; text: string }[] = [
   {
     label: "Rapat / Briefing",
     text: "Halo {nama},\n\n📅 *UNDANGAN RAPAT*\nHari/Tanggal: [isi]\nJam: [isi]\nTempat: Kantor Mateha — https://maps.app.goo.gl/m1sABY77cMVRf3Zx8\nAgenda: [isi]\n\nMohon hadir tepat waktu ya. Terima kasih!\n— {pengirim}",
+  },
+  {
+    label: "Info Akun & Login",
+    text: [
+      "Halo {nama} 👋",
+      "",
+      "🔐 *INFO AKUN MATEHA FINANCE*",
+      "Berikut detail akun Anda:",
+      "👤 Username: *{username}*",
+      "🏷️ Peran: {peran}",
+      "🌐 Link login: {link_login}",
+      "🔑 Password: gunakan password yang sudah diberikan admin. Lupa password? Hubungi admin untuk di-reset.",
+      "",
+      "*Cara login*",
+      "1. Buka {link_login}",
+      "2. Isi kolom *Username atau Email* dengan: {username}",
+      "3. Isi *Kata Sandi*, lalu tekan *Masuk ke Sistem*",
+      "",
+      "*Cara ganti password*",
+      "1. Setelah login, di HP tekan *Menu* (pojok kanan bawah) → *Ganti Password*. Di laptop/PC, klik tombol *Password* di kiri bawah (di bawah nama Anda).",
+      "2. Isi password lama, lalu password baru (minimal 6 karakter) dua kali.",
+      "3. Tekan *Simpan Password Baru*. Login berikutnya pakai password baru.",
+      "",
+      "Mohon segera ganti password Anda dan jangan bagikan ke siapa pun ya. 🙏",
+      "— {pengirim}, Mateha Production",
+    ].join("\n"),
   },
   {
     label: "Pengingat Finance",
@@ -59,13 +85,20 @@ export default function BroadcastView({ currentUserName }: { currentUserName: st
   }, [message]);
 
   const first = selected[0];
-  const preview = renderTemplate(message, { nama: first?.name || "Nama Penerima", peran: first?.role || "staff", pengirim: currentUserName });
+  const preview = renderTemplate(message, {
+    nama: first?.name || "Nama Penerima",
+    peran: first?.role || "staff",
+    username: first?.username || "username",
+    link_login: window.location.origin,
+    pengirim: currentUserName,
+  });
+  const mentionsPassword = /password|kata sandi/i.test(message);
 
   const sendTest = async () => {
     setBusy("test");
     setNotice(null);
     try {
-      const res = await aiFetch<{ message: string }>("/wa/broadcast/send", { method: "POST", body: { message, mode: "test" } });
+      const res = await aiFetch<{ message: string }>("/wa/broadcast/send", { method: "POST", body: { message, mode: "test", origin: window.location.origin } });
       setNotice({ ok: true, text: res.message });
     } catch (err: any) {
       setNotice({ ok: false, text: err.message });
@@ -85,7 +118,7 @@ export default function BroadcastView({ currentUserName }: { currentUserName: st
         const chunk = targets.slice(i, i + BATCH);
         const res = await aiFetch<{ results: { uid: string; status: WaSendStatus["status"]; reason: string | null }[] }>("/wa/broadcast/send", {
           method: "POST",
-          body: { message, mode: "send", recipients: chunk.map((c) => c.uid) },
+          body: { message, mode: "send", recipients: chunk.map((c) => c.uid), origin: window.location.origin },
         });
         setStatuses((prev) => ({ ...prev, ...Object.fromEntries(res.results.map((r) => [r.uid, { status: r.status, reason: r.reason }])) }));
         setProgress({ done: Math.min(targets.length, i + BATCH), total: targets.length });
@@ -145,6 +178,12 @@ export default function BroadcastView({ currentUserName }: { currentUserName: st
             ))}
             <span className="ml-auto text-[10px] text-slate-500 font-mono">{message.length}/3000</span>
           </div>
+          {mentionsPassword && (
+            <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+              Demi keamanan, password tidak ikut dikirim. Jangan ketik password siapa pun di pesan broadcast — beri tahu langsung secara pribadi, atau reset
+              passwordnya dulu di Manajemen Staff.
+            </p>
+          )}
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Pratinjau ({first?.name || "contoh"})</p>
             <pre className="whitespace-pre-wrap rounded-xl border border-slate-800 bg-[#0b141a] p-3 text-[11px] text-slate-100 font-sans leading-relaxed max-h-64 overflow-y-auto">{preview}</pre>

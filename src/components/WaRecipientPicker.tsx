@@ -4,6 +4,7 @@ import { CheckCircle2, Clock, Loader2, Search, XCircle } from "lucide-react";
 export interface WaStaffMember {
   uid: string;
   name: string;
+  username?: string;
   role: string;
   active: boolean;
   hasPhone: boolean;

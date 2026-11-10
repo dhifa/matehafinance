@@ -249,6 +249,7 @@ class WhatsApp extends BaseApiController
             $staff[] = [
                 'uid'      => $doc['id'],
                 'name'     => (string) (($u['displayName'] ?? '') ?: ($u['username'] ?? $doc['id'])),
+                'username' => (string) ($u['username'] ?? ''),
                 'role'     => strtolower((string) ($u['role'] ?? 'staff')),
                 'active'   => ($u['status'] ?? '') !== 'nonaktif',
                 'hasPhone' => $phone !== '',
@@ -365,14 +366,16 @@ class WhatsApp extends BaseApiController
         $user   = Auth::user();
         $me     = $store->get('users', $user['uid']) ?? [];
         $sender = (string) (($me['displayName'] ?? '') ?: $user['username']);
-        $vars   = static fn (string $name, string $role) => ['nama' => $name, 'peran' => $role, 'pengirim' => $sender];
+        // Account details for the "Info Akun & Login" template. Passwords are never sent.
+        $login  = $this->appOrigin() ?: 'https://financestg.mateha.co.id';
+        $vars   = static fn (string $name, string $role, string $username) => ['nama' => $name, 'peran' => $role, 'pengirim' => $sender, 'username' => $username, 'link_login' => $login];
         $ref    = mb_substr(preg_replace('/\s+/', ' ', $message), 0, 60);
 
         if ($mode === 'test') {
             if ($cfg['testNumber'] === '') {
                 return $this->fail(400, 'failed-precondition', 'Isi Nomor Tes di Pengaturan WhatsApp terlebih dahulu.');
             }
-            $sent = AtlanticNotify::sendText($cfg, $cfg['testNumber'], "🧪 *PESAN TES*\n\n" . self::render($message, $vars($sender, $user['role'] ?: 'admin')));
+            $sent = AtlanticNotify::sendText($cfg, $cfg['testNumber'], "🧪 *PESAN TES*\n\n" . self::render($message, $vars($sender, $user['role'] ?: 'admin', (string) $user['username'])));
             $this->log('broadcast-test', $ref, $user['uid'], $sender, $sent);
 
             return $sent['ok']
@@ -394,7 +397,7 @@ class WhatsApp extends BaseApiController
                 if ($i > 0) {
                     usleep(self::SEND_GAP_US);
                 }
-                $result = AtlanticNotify::sendText($cfg, $phone, self::render($message, $vars($name, strtolower((string) ($u['role'] ?? 'staff')))));
+                $result = AtlanticNotify::sendText($cfg, $phone, self::render($message, $vars($name, strtolower((string) ($u['role'] ?? 'staff')), (string) (($u['username'] ?? '') ?: '-'))));
             }
             $this->log('broadcast', $ref, $uid, $name, $result);
             $results[] = ['uid' => $uid, 'name' => $name, 'status' => $result['ok'] ? 'terkirim' : 'gagal', 'reason' => $result['reason'] ?? null];
