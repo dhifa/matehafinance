@@ -3,6 +3,7 @@ import { Loader2, Megaphone, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { apiFetch as aiFetch } from "../lib/api";
 import { renderTemplate } from "../utils/waTemplates";
 import WaRecipientPicker, { WaSendStatus, WaStaffMember } from "./WaRecipientPicker";
+import { confirmDialog } from "../utils/notification";
 
 const BATCH = 5;
 const VARIABLES = ["nama", "peran", "username", "password", "link_login", "pengirim"];
@@ -115,10 +116,13 @@ export default function BroadcastView({ currentUserName, isAdmin }: { currentUse
 
   const send = async (targets: WaStaffMember[]) => {
     if (!targets.length || !message.trim()) return;
-    const question = withPassword
-      ? `Kirim pesan ini ke ${targets.length} orang?\n\nPASSWORD MEREKA AKAN DIGANTI dengan password baru acak (dikirim di pesan). Password lama tidak berlaku lagi dan mereka akan logout. Hanya diganti bila pesan berhasil terkirim.`
-      : `Kirim pesan ini ke ${targets.length} orang via WhatsApp?`;
-    if (!window.confirm(question)) return;
+    const ok = withPassword
+      ? await confirmDialog(
+          `Password ${targets.length} orang ini akan DIGANTI dengan password baru acak yang dikirim di pesan.\n\nPassword lama tidak berlaku lagi dan mereka akan logout. Password hanya diganti bila pesan berhasil terkirim.`,
+          { title: `Kirim info akun ke ${targets.length} orang?`, confirmText: "Ya, Kirim & Ganti Password", type: "error" }
+        )
+      : await confirmDialog(`Pesan akan dikirim via WhatsApp ke ${targets.length} orang.`, { title: "Kirim broadcast?", confirmText: "Ya, Kirim", type: "info" });
+    if (!ok) return;
     setBusy("send");
     setNotice(null);
     setProgress({ done: 0, total: targets.length });
@@ -163,7 +167,10 @@ export default function BroadcastView({ currentUserName, isAdmin }: { currentUse
               <button
                 key={t.label}
                 type="button"
-                onClick={() => (message.trim() && message !== t.text && !window.confirm("Ganti isi pesan dengan template ini?") ? null : setMessage(t.text))}
+                onClick={async () => {
+                  if (message.trim() && message !== t.text && !(await confirmDialog("Isi pesan sekarang akan diganti dengan template ini.", { title: "Ganti isi pesan?", confirmText: "Ya, Ganti", type: "info" }))) return;
+                  setMessage(t.text);
+                }}
                 className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border bg-slate-950 border-slate-800 text-slate-300 hover:text-white cursor-pointer"
               >
                 {t.label}

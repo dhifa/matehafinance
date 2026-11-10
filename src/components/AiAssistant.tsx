@@ -13,6 +13,7 @@ import {
   AiDocItem, AiInvoiceDraft, AiKwitansiDraft, AiQuotationDraft,
   createInvoiceFromDraft, createKwitansiFromDraft, createQuotationFromDraft,
 } from "../utils/aiDocuments";
+import { confirmDialog } from "../utils/notification";
 
 export interface AiDraftItem {
   description: string;
@@ -827,7 +828,7 @@ function MemoryPanel({ onClose }: { onClose: () => void }) {
                 </button>
               )}
               <button
-                onClick={() => window.confirm("Hapus aturan ini dari memori AI?") && run(() => apiFetch(`/ai/memories/${m.id}`, { method: "DELETE" }))}
+                onClick={async () => (await confirmDialog("Aturan ini akan dihapus dari memori AI.", { title: "Hapus aturan?", confirmText: "Ya, Hapus", type: "error" })) && run(() => apiFetch(`/ai/memories/${m.id}`, { method: "DELETE" }))}
                 className="text-slate-400 hover:text-rose-300 cursor-pointer"
                 aria-label="Hapus"
               >

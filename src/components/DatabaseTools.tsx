@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { AlertTriangle, CheckCircle2, Database, FileJson, Loader2, Upload } from "lucide-react";
 import { apiDownload, apiFetch } from "../lib/api";
+import { confirmDialog } from "../utils/notification";
 
 interface ImportResult {
   rows: { collection: string; imported: number; skipped: number }[];
@@ -24,7 +25,7 @@ export default function DatabaseTools() {
 
   const runImport = async () => {
     if (!file) return;
-    if (overwrite && !window.confirm("Data yang ID-nya sama akan DITIMPA dengan isi file backup. Lanjutkan?")) return;
+    if (overwrite && !(await confirmDialog("Data yang ID-nya sama akan DITIMPA dengan isi file backup.", { title: "Timpa data?", confirmText: "Ya, Timpa", type: "error" }))) return;
     setBusy("import");
     setError(null);
     setResult(null);

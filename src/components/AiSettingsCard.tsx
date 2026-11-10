@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Sparkles, Loader2, CheckCircle2, XCircle, Eye, EyeOff, Trash2, KeyRound, ExternalLink } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { confirmDialog } from "../utils/notification";
 
 interface AiStatus {
   configured: boolean;
@@ -44,7 +45,7 @@ export default function AiSettingsCard() {
         });
         setMessage({ ok: res.ok, text: res.message });
       } else {
-        if (!window.confirm("Hapus API key Gemini dari dashboard?")) return;
+        if (!(await confirmDialog("API key Gemini akan dihapus dari dashboard.", { title: "Hapus API key?", confirmText: "Ya, Hapus", type: "error" }))) return;
         const next = await apiFetch<AiStatus>("/admin/settings/ai", { method: "DELETE" });
         setStatus(next);
         setMessage({ ok: true, text: next.configured ? "Key dashboard dihapus. Sekarang memakai GEMINI_API_KEY dari file .env." : "API key dihapus." });

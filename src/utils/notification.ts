@@ -83,6 +83,32 @@ export const notify = {
   },
 };
 
+/**
+ * In-app replacement for window.confirm: shows the app's own pop-up with
+ * confirm/cancel buttons and resolves true only when the user confirms.
+ */
+export const confirmDialog = (
+  message: string,
+  opts: { title?: string; confirmText?: string; cancelText?: string; type?: PopupNotificationState["type"] } = {}
+): Promise<boolean> =>
+  new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    notify.popup({
+      type: opts.type || "warning",
+      title: opts.title || "Konfirmasi",
+      message,
+      confirmText: opts.confirmText || "Ya, Lanjutkan",
+      cancelText: opts.cancelText || "Batal",
+      onConfirm: () => finish(true),
+      onCancel: () => finish(false),
+    });
+  });
+
 // Safe fallback for window.alert in case any legacy call or browser block occurs
 if (typeof window !== "undefined") {
   window.alert = (msg?: any) => {

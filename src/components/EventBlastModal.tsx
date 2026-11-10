@@ -14,6 +14,7 @@ import {
   formatEventDates,
   renderTemplate,
 } from "../utils/waTemplates";
+import { confirmDialog } from "../utils/notification";
 
 const BATCH = 5;
 
@@ -85,7 +86,7 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
   const send = async (targets: StaffMember[]) => {
     if (!targets.length) return;
     const label = EVENT_BLAST_KINDS.find((k) => k.key === kind)!.label;
-    if (!window.confirm(`Kirim "${label}" ${event.name} ke ${targets.length} orang via WhatsApp?`)) return;
+    if (!(await confirmDialog(`"${label}" untuk ${event.name} akan dikirim via WhatsApp ke ${targets.length} orang.`, { title: "Kirim blast WA?", confirmText: "Ya, Kirim", type: "info" }))) return;
     setBusy("send");
     setMessage(null);
     setProgress({ done: 0, total: targets.length });

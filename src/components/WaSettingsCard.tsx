@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { CheckCircle2, Eye, EyeOff, Loader2, MessageCircle, Trash2, XCircle } from "lucide-react";
 import { apiFetch as aiFetch } from "../lib/api";
+import { confirmDialog } from "../utils/notification";
 
 export interface WaStatus {
   configured: boolean;
@@ -38,7 +39,7 @@ export default function WaSettingsCard() {
   }, []);
 
   const run = async (kind: "save" | "test" | "delete") => {
-    if (kind === "delete" && !window.confirm("Hapus pengaturan WhatsApp (API key & Device ID)?")) return;
+    if (kind === "delete" && !(await confirmDialog("API key dan Device ID WhatsApp akan dihapus. Pengiriman WA berhenti sampai diisi lagi.", { title: "Hapus pengaturan WhatsApp?", confirmText: "Ya, Hapus", type: "error" }))) return;
     setBusy(kind);
     setMessage(null);
     try {

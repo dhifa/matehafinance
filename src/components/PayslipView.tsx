@@ -53,6 +53,7 @@ import ttd from "../../assets/ttd.png";
 import { formatMultiDates, parseIndonesianDateText } from "../utils/date";
 import { saveAs } from "file-saver";
 import { generateStaffPayslipPdfBlob, printStaffPayslipDirectly, StaffPayslipPdfData } from "../utils/pdfGenerator";
+import { confirmDialog } from "../utils/notification";
 
 interface PayslipViewProps {
   projects: EventProject[];
@@ -580,7 +581,7 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
       onNotify("Semua slip gaji staf untuk periode ini sudah terpublikasi!", "info");
       return;
     }
-    if (!window.confirm(`Publikasikan ${drafts.length} slip gaji staf sekaligus ke masing-masing akun staf?`)) {
+    if (!(await confirmDialog(`${drafts.length} slip gaji akan dipublikasikan ke akun masing-masing staf.`, { title: "Publikasikan semua slip?", confirmText: "Ya, Publikasikan", type: "info" }))) {
       return;
     }
 
