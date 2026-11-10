@@ -1341,7 +1341,12 @@ _Sistem Keuangan Otomatis Mateha Production_`;
 
   // Not Authenticated -> Show login screen (Always)
   if (!user) {
-    return <LoginScreen onSuccess={() => triggerNotification("Otentikasi berhasil!")} />;
+    return (
+      <>
+        <LoginScreen onSuccess={() => triggerNotification("Otentikasi berhasil!")} />
+        <NotificationModal popup={popupNotification} onClose={() => setPopupNotification(null)} />
+      </>
+    );
   }
 
   // Profile still loading from Firestore
