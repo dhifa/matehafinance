@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Loader2, Megaphone, RotateCcw, Save, Send, ShieldCheck, X } from "lucide-react";
+import { Copy, Loader2, Megaphone, RotateCcw, Save, Send, ShieldCheck, Users, X } from "lucide-react";
 import WaRecipientPicker, { WaSendStatus as Status, WaStaffMember as StaffMember } from "./WaRecipientPicker";
 import { doc, getDoc, setDoc } from "../lib/firestore";
 import { db } from "../utils/backend";
@@ -12,6 +12,7 @@ import {
   EventBlastKind,
   TEMPLATE_VARIABLES,
   formatEventDates,
+  reimburseLink,
   renderTemplate,
 } from "../utils/waTemplates";
 import { confirmDialog } from "../utils/notification";
@@ -45,8 +46,7 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
 
 
   const template = templates[kind];
-  const preview = renderTemplate(template, {
-    nama: selected[0]?.name || "Nama Kru",
+  const eventVars = {
     acara: event.name || "-",
     tanggal: formatEventDates(event.dates, event.date),
     call_time: event.callTime || "-",
@@ -55,8 +55,28 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
     titik_kumpul: event.meetingPoint || DEFAULT_MEETING_POINT,
     pic: event.picName || "-",
     rundown: event.rundownUrl || "-",
+    reimburse: reimburseLink(window.location.origin, event),
     catatan: event.crewNotes || "-",
+  };
+  // One message for a WhatsApp group: no personal name
+  const groupText = renderTemplate(template, { ...eventVars, nama: "Tim" });
+  const missingReimburse = kind !== "pembatalan" && !template.includes("{reimburse}");
+  const preview = renderTemplate(template, {
+    ...eventVars,
+    nama: selected[0]?.name || "Nama Kru",
   });
+
+  const openGroupShare = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(groupText)}`, "_blank");
+  };
+  const copyGroupText = async () => {
+    try {
+      await navigator.clipboard.writeText(groupText);
+      setMessage({ ok: true, text: "Teks untuk grup disalin. Tempel di grup WhatsApp tim." });
+    } catch {
+      setMessage({ ok: false, text: "Gagal menyalin. Pakai tombol Kirim ke Grup WA." });
+    }
+  };
 
   const saveTemplates = async () => {
     setBusy("save");
@@ -74,7 +94,7 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
     setBusy("test");
     setMessage(null);
     try {
-      const res = await aiFetch<{ message: string }>("/wa/events/send", { method: "POST", body: { eventId: event.id, template, mode: "test" } });
+      const res = await aiFetch<{ message: string }>("/wa/events/send", { method: "POST", body: { eventId: event.id, template, mode: "test", origin: window.location.origin } });
       setMessage({ ok: true, text: res.message });
     } catch (err: any) {
       setMessage({ ok: false, text: err.message });
@@ -95,7 +115,7 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
         const chunk = targets.slice(i, i + BATCH);
         const res = await aiFetch<{ results: { uid: string; status: Status["status"]; reason: string | null }[] }>("/wa/events/send", {
           method: "POST",
-          body: { eventId: event.id, template, mode: "send", recipients: chunk.map((c) => c.uid) },
+          body: { eventId: event.id, template, mode: "send", recipients: chunk.map((c) => c.uid), origin: window.location.origin },
         });
         setStatuses((prev) => ({ ...prev, ...Object.fromEntries(res.results.map((r) => [r.uid, { status: r.status, reason: r.reason }])) }));
         setProgress({ done: Math.min(targets.length, i + BATCH), total: targets.length });
@@ -171,6 +191,11 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
             <div>
               <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Pratinjau ({selected[0]?.name || "contoh"})</p>
               <pre className="whitespace-pre-wrap rounded-xl border border-slate-800 bg-[#0b141a] p-3 text-[11px] text-slate-100 font-sans leading-relaxed max-h-56 overflow-y-auto">{preview}</pre>
+              {missingReimburse && (
+                <p className="text-[10px] text-amber-300 mt-1">
+                  Template ini belum berisi link reimburse. Klik variabel <span className="font-mono">{"{reimburse}"}</span> atau "Kembalikan template bawaan".
+                </p>
+              )}
               {(!event.callTime || !event.picName) && (
                 <p className="text-[10px] text-amber-300 mt-1">Call time / PIC event masih kosong. Isi di bagian Info Kru pada Lembar Kerja.</p>
               )}
@@ -189,6 +214,14 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
           )}
           {message && <p className={`text-xs ${message.ok ? "text-emerald-300" : "text-rose-300"}`}>{message.text}</p>}
           <div className="flex flex-wrap gap-2 justify-end">
+            <div className="flex gap-2 mr-auto">
+              <button type="button" onClick={openGroupShare} disabled={busy === "send"} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 text-xs font-bold cursor-pointer disabled:opacity-50" title="Buka WhatsApp lalu pilih grup tim">
+                <Users className="w-3.5 h-3.5" /> Kirim ke Grup WA
+              </button>
+              <button type="button" onClick={copyGroupText} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer" title="Salin teks untuk grup">
+                <Copy className="w-3.5 h-3.5" /> Salin teks
+              </button>
+            </div>
             <button type="button" onClick={sendTest} disabled={busy !== null} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-xs font-semibold text-slate-200 cursor-pointer disabled:opacity-50">
               {busy === "test" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
               Kirim tes ke saya

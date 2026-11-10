@@ -290,6 +290,10 @@ class WhatsApp extends BaseApiController
         if ($event === null) {
             return $this->fail(404, 'not-found', 'Event tidak ditemukan.');
         }
+        // Point B page where crew log expenses (same link as "Bagikan Point B")
+        $reimburse = ! empty($event['isPointBClosed'])
+            ? '(input reimburse sedang ditutup admin)'
+            : $this->appOrigin() . '/?shareProject=' . rawurlencode($eventId);
         $vars = static fn (string $name) => [
             'nama'      => $name,
             'acara'     => (string) ($event['name'] ?? '-'),
@@ -300,6 +304,7 @@ class WhatsApp extends BaseApiController
             'titik_kumpul' => (string) (($event['meetingPoint'] ?? '') ?: self::DEFAULT_MEETING_POINT),
             'pic'       => (string) (($event['picName'] ?? '') ?: '-'),
             'rundown'   => (string) (($event['rundownUrl'] ?? '') ?: '-'),
+            'reimburse' => $reimburse,
             'catatan'   => (string) (($event['crewNotes'] ?? '') ?: '-'),
         ];
         $ref  = $eventId . ':' . mb_substr((string) ($event['name'] ?? ''), 0, 60);

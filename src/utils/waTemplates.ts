@@ -12,7 +12,12 @@ export const EVENT_BLAST_KINDS: { key: EventBlastKind; label: string }[] = [
   { key: "pembatalan", label: "Pembatalan" },
 ];
 
-export const TEMPLATE_VARIABLES = ["nama", "acara", "tanggal", "call_time", "lokasi", "maps", "titik_kumpul", "pic", "rundown", "catatan"];
+export const TEMPLATE_VARIABLES = ["nama", "acara", "tanggal", "call_time", "lokasi", "maps", "titik_kumpul", "pic", "rundown", "reimburse", "catatan"];
+
+/** Point B page of the event, where crew log their expenses (reimburse). Same link as "Bagikan Point B". */
+export function reimburseLink(origin: string, event: { id: string; isPointBClosed?: boolean }): string {
+  return event.isPointBClosed ? "(input reimburse sedang ditutup admin)" : `${origin}/?shareProject=${event.id}`;
+}
 
 /** Where the crew gathers before leaving, unless an event sets its own meeting point. */
 export const DEFAULT_MEETING_POINT = "Kantor Mateha — https://maps.app.goo.gl/m1sABY77cMVRf3Zx8";
@@ -29,6 +34,7 @@ export const DEFAULT_EVENT_TEMPLATES: Record<EventBlastKind, string> = {
     "🚩 Titik kumpul tim: {titik_kumpul}",
     "👤 PIC: {pic}",
     "📋 Rundown: {rundown}",
+    "💸 Input reimburse: {reimburse}",
     "📝 Catatan: {catatan}",
     "",
     "Mohon konfirmasi kehadiran ya. Terima kasih! 🙏",
@@ -45,6 +51,7 @@ export const DEFAULT_EVENT_TEMPLATES: Record<EventBlastKind, string> = {
     "🗺️ Maps lokasi venue: {maps}",
     "🚩 Titik kumpul tim: {titik_kumpul}",
     "👤 PIC: {pic}",
+    "💸 Input reimburse: {reimburse}",
     "",
     "Mohon sesuaikan jadwal Anda. Terima kasih 🙏",
     "— Mateha Production",
