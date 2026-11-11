@@ -185,13 +185,37 @@ class AtlanticNotify
     }
 
     private const GROUP_ID = '/^\d[\d-]*@g\.us$/';
-    private const ID_KEYS  = ['id', 'jid', 'group_id', 'groupId', 'chat_id', 'chatId', 'gid', 'wa_id', 'remoteJid'];
+    private const ID_KEYS  = ['id', 'jid', 'group_id', 'groupid', 'groupjid', 'chat_id', 'chatid', 'gid', 'wa_id', 'remotejid'];
+
+    /** Field lookup that ignores letter case (the gateway sends e.g. "JID" and "Name"). */
+    private static function field(mixed $obj, string ...$names): mixed
+    {
+        if (! is_array($obj)) {
+            return null;
+        }
+        foreach ($names as $name) {
+            if (array_key_exists($name, $obj)) {
+                return $obj[$name];
+            }
+        }
+        $lower = [];
+        foreach (array_keys($obj) as $k) {
+            $lower[strtolower((string) $k)] ??= $k;
+        }
+        foreach ($names as $name) {
+            if (isset($lower[strtolower($name)])) {
+                return $obj[$lower[strtolower($name)]];
+            }
+        }
+
+        return null;
+    }
 
     /** An id field as a group id ("120363…@g.us"), or "" when it is not a group. */
     private static function groupIdOf(array $obj): string
     {
         foreach (self::ID_KEYS as $key) {
-            $v = $obj[$key] ?? null;
+            $v = self::field($obj, $key);
             if (is_array($v)) {
                 $v = $v['_serialized'] ?? ((($v['server'] ?? '') === 'g.us' && ! empty($v['user'])) ? $v['user'] . '@g.us' : ($v['id'] ?? null));
             }
@@ -200,7 +224,7 @@ class AtlanticNotify
             }
             $id = trim((string) $v);
             // A bare number counts as a group only where the field or object is clearly a group
-            if (preg_match('/^\d[\d-]*$/', $id) && ($key === 'group_id' || $key === 'groupId' || array_key_exists('subject', $obj) || array_key_exists('participants', $obj))) {
+            if (preg_match('/^\d[\d-]*$/', $id) && ($key === 'group_id' || $key === 'groupid' || self::field($obj, 'subject') !== null || self::field($obj, 'participants') !== null)) {
                 $id .= '@g.us';
             }
             if (preg_match(self::GROUP_ID, $id)) {
@@ -223,10 +247,12 @@ class AtlanticNotify
     {
         $out = [];
         $add = static function (string $id, ?array $g) use (&$out): void {
-            $name = trim((string) ($g['name'] ?? $g['subject'] ?? $g['title'] ?? $g['groupMetadata']['subject'] ?? $g['group_name'] ?? ''));
-            $size = $g['size'] ?? $g['participants_count'] ?? $g['participantsCount'] ?? $g['member_count'] ?? $g['members_count'] ?? null;
-            if ($size === null && isset($g['participants']) && is_array($g['participants'])) {
-                $size = count($g['participants']);
+            // Topic / description is never used: it can hold private notes
+            $name    = trim((string) (self::field($g, 'name', 'subject', 'title', 'group_name') ?? self::field(self::field($g, 'groupMetadata'), 'subject') ?? ''));
+            $size    = self::field($g, 'size', 'participants_count', 'participantscount', 'participantcount', 'member_count', 'members_count');
+            $members = self::field($g, 'participants');
+            if ($size === null && is_array($members)) {
+                $size = count($members);
             }
             $prev     = $out[$id] ?? null;
             $out[$id] = [
@@ -256,7 +282,7 @@ class AtlanticNotify
                 }
             }
             foreach ($node as $k => $v) {
-                if ($k === 'participants') {
+                if (is_string($k) && strtolower($k) === 'participants') {
                     continue; // members are people, not groups
                 }
                 if (is_array($v) || (is_string($v) && array_is_list($node))) {
