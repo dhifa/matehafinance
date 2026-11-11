@@ -90,11 +90,15 @@ export default function WaGroupPanel({ event, staff }: { event: EventProject; st
     setBusy("refresh");
     setNotice(null);
     try {
-      const r = await aiFetch<{ groups: WaGroup[]; fetchedAt: string }>("/wa/groups/refresh", { method: "POST", body: {} });
+      const r = await aiFetch<{ groups: WaGroup[]; fetchedAt: string; diagnostic?: string | null }>("/wa/groups/refresh", { method: "POST", body: {} });
       setGroups(r.groups);
       setFetchedAt(r.fetchedAt);
       setPicked((prev) => prev.filter((id) => r.groups.some((g) => g.id === id)));
-      setNotice({ ok: true, message: r.groups.length ? `${r.groups.length} grup dimuat.` : "Nomor pengirim belum bergabung di grup mana pun." });
+      setNotice(
+        r.groups.length
+          ? { ok: true, message: `${r.groups.length} grup dimuat.` }
+          : { ok: false, message: r.diagnostic || "Nomor pengirim belum bergabung di grup mana pun." }
+      );
     } catch (err: any) {
       setNotice({ ok: false, message: err.message });
     } finally {
@@ -227,7 +231,10 @@ export default function WaGroupPanel({ event, staff }: { event: EventProject; st
           {busy === "load" ? (
             <p className="p-3 text-xs text-slate-400 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Memuat…</p>
           ) : groups.length === 0 ? (
-            <p className="p-3 text-xs text-slate-400">Belum ada daftar grup. Klik <strong>Muat daftar grup</strong>. Nomor WhatsApp Mateha harus sudah jadi anggota grupnya.</p>
+            <div className="p-3 space-y-1.5">
+              <p className="text-xs text-slate-400">Belum ada daftar grup. Klik <strong>Muat daftar grup</strong>. Nomor WhatsApp Mateha harus sudah jadi anggota grupnya.</p>
+              {notice && !notice.ok && <p className="text-[11px] text-rose-300 break-words font-mono">{notice.message}</p>}
+            </div>
           ) : (
             groups.map((g) => {
               const st = statuses[g.id];
@@ -296,7 +303,7 @@ export default function WaGroupPanel({ event, staff }: { event: EventProject; st
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(progress.done / progress.total) * 100}%` }} />
           </div>
         )}
-        {notice && <p className={`text-xs ${notice.ok ? "text-emerald-300" : "text-rose-300"}`}>{notice.message}</p>}
+        {notice && <p className={`text-xs break-words ${notice.ok ? "text-emerald-300" : "text-rose-300"}`}>{notice.message}</p>}
         <div className="flex flex-wrap gap-2 justify-end">
           <button type="button" onClick={sendTest} disabled={busy !== null || !message.trim()} className={`${btn} border border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-slate-200`}>
             {busy === "test" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}

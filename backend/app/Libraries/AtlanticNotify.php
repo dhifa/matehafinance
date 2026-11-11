@@ -170,54 +170,126 @@ class AtlanticNotify
                 return ['ok' => false, 'message' => self::failureReason($status, $body), 'groups' => []];
             }
 
-            return ['ok' => true, 'message' => 'OK', 'groups' => self::parseGroups($body)];
+            $groups = self::parseGroups($body);
+            if ($groups === []) {
+                $note = is_string($body['message'] ?? null) && $body['message'] !== '' ? ' Pesan Atlantic-Notify: "' . mb_substr($body['message'], 0, 150) . '".' : '';
+                log_message('warning', 'Atlantic-Notify GET /groups returned no group ids. Shape: ' . self::describeShape($body));
+
+                return ['ok' => true, 'message' => 'Tidak ada grup yang terbaca dari jawaban Atlantic-Notify.' . $note . ' Bentuk respons: ' . mb_substr(self::describeShape($body), 0, 600), 'groups' => []];
+            }
+
+            return ['ok' => true, 'message' => 'OK', 'groups' => $groups];
         } catch (Throwable $e) {
             return ['ok' => false, 'message' => 'Gagal menghubungi Atlantic-Notify: ' . mb_substr($e->getMessage(), 0, 150), 'groups' => []];
         }
     }
 
+    private const GROUP_ID = '/^\d[\d-]*@g\.us$/';
+    private const ID_KEYS  = ['id', 'jid', 'group_id', 'groupId', 'chat_id', 'chatId', 'gid', 'wa_id', 'remoteJid'];
+
+    /** An id field as a group id ("120363…@g.us"), or "" when it is not a group. */
+    private static function groupIdOf(array $obj): string
+    {
+        foreach (self::ID_KEYS as $key) {
+            $v = $obj[$key] ?? null;
+            if (is_array($v)) {
+                $v = $v['_serialized'] ?? ((($v['server'] ?? '') === 'g.us' && ! empty($v['user'])) ? $v['user'] . '@g.us' : ($v['id'] ?? null));
+            }
+            if ($v === null || is_array($v)) {
+                continue;
+            }
+            $id = trim((string) $v);
+            // A bare number counts as a group only where the field or object is clearly a group
+            if (preg_match('/^\d[\d-]*$/', $id) && ($key === 'group_id' || $key === 'groupId' || array_key_exists('subject', $obj) || array_key_exists('participants', $obj))) {
+                $id .= '@g.us';
+            }
+            if (preg_match(self::GROUP_ID, $id)) {
+                return $id;
+            }
+        }
+
+        return '';
+    }
+
     /**
-     * Reads a group list from any response shape (the GET /groups response is
-     * not documented): data / data.groups / groups, id / jid / group_id (maybe
-     * {_serialized}), name / subject. Only WhatsApp group ids (…@g.us) are kept.
+     * Finds the groups anywhere in a GET /groups response. The response shape
+     * is not documented, so the whole JSON is walked: lists, objects keyed by
+     * group id, nested data / groups / result fields, or plain lists of ids.
+     * Only WhatsApp group ids (…@g.us) are kept.
      *
      * @return list<array{id: string, name: string, size: int|null}>
      */
     public static function parseGroups(mixed $body): array
     {
-        $list = [];
-        foreach ([$body['data']['groups'] ?? null, $body['data']['data'] ?? null, $body['groups'] ?? null, $body['data'] ?? null, $body['results'] ?? null, $body] as $cand) {
-            if (is_array($cand) && $cand !== [] && array_is_list($cand)) {
-                $list = $cand;
-                break;
-            }
-        }
         $out = [];
-        foreach ($list as $g) {
-            if (! is_array($g)) {
-                continue;
-            }
-            $id = $g['id'] ?? $g['jid'] ?? $g['group_id'] ?? $g['groupId'] ?? $g['chat_id'] ?? '';
-            if (is_array($id)) {
-                $id = $id['_serialized'] ?? $id['id'] ?? '';
-            }
-            $id = trim((string) $id);
-            if ($id !== '' && ! str_contains($id, '@')) {
-                $id .= '@g.us';
-            }
-            if (! preg_match('/^[0-9-]+@g\.us$/', $id)) {
-                continue;
-            }
-            $name = trim((string) ($g['name'] ?? $g['subject'] ?? $g['title'] ?? $g['groupMetadata']['subject'] ?? ''));
-            $size = $g['size'] ?? $g['participants_count'] ?? $g['participantsCount'] ?? $g['member_count'] ?? null;
+        $add = static function (string $id, ?array $g) use (&$out): void {
+            $name = trim((string) ($g['name'] ?? $g['subject'] ?? $g['title'] ?? $g['groupMetadata']['subject'] ?? $g['group_name'] ?? ''));
+            $size = $g['size'] ?? $g['participants_count'] ?? $g['participantsCount'] ?? $g['member_count'] ?? $g['members_count'] ?? null;
             if ($size === null && isset($g['participants']) && is_array($g['participants'])) {
                 $size = count($g['participants']);
             }
-            $out[$id] = ['id' => $id, 'name' => mb_substr($name !== '' ? $name : $id, 0, 120), 'size' => is_numeric($size) ? (int) $size : null];
-        }
+            $prev     = $out[$id] ?? null;
+            $out[$id] = [
+                'id'   => $id,
+                'name' => mb_substr($name !== '' ? $name : ($prev['name'] ?? $id), 0, 120),
+                'size' => is_numeric($size) ? (int) $size : ($prev['size'] ?? null),
+            ];
+        };
+        $walk = static function (mixed $node, int $depth, ?string $keyHint = null) use (&$walk, $add): void {
+            if ($depth > 8 || $node === null) {
+                return;
+            }
+            if (is_string($node)) {
+                if (preg_match(self::GROUP_ID, trim($node))) {
+                    $add(trim($node), null);
+                }
+
+                return;
+            }
+            if (! is_array($node)) {
+                return;
+            }
+            if (! array_is_list($node)) {
+                $id = self::groupIdOf($node) ?: (($keyHint !== null && preg_match(self::GROUP_ID, $keyHint)) ? $keyHint : '');
+                if ($id !== '') {
+                    $add($id, $node);
+                }
+            }
+            foreach ($node as $k => $v) {
+                if ($k === 'participants') {
+                    continue; // members are people, not groups
+                }
+                if (is_array($v) || (is_string($v) && array_is_list($node))) {
+                    $walk($v, $depth + 1, is_string($k) ? $k : null);
+                } elseif (is_string($v) && is_string($k) && preg_match(self::GROUP_ID, $k)) {
+                    $add($k, ['name' => $v]);
+                }
+            }
+        };
+        $walk($body, 0);
         $out = array_values($out);
         usort($out, static fn ($a, $b) => strcasecmp($a['name'], $b['name']));
 
         return $out;
+    }
+
+    /** Field names and types only (no values), to diagnose an unexpected response. */
+    public static function describeShape(mixed $node, int $depth = 0): string
+    {
+        if ($node === null) {
+            return 'null';
+        }
+        if (! is_array($node)) {
+            return match (true) { is_bool($node) => 'boolean', is_int($node), is_float($node) => 'number', default => 'string' };
+        }
+        if (array_is_list($node)) {
+            return 'array(' . count($node) . ')' . ($node !== [] && $depth <= 2 ? ' of ' . self::describeShape($node[0], $depth + 1) : '');
+        }
+        $keys = array_slice(array_keys($node), 0, 12);
+        if ($depth > 2) {
+            return '{' . implode(', ', $keys) . '}';
+        }
+
+        return '{' . implode(', ', array_map(static fn ($k) => $k . ': ' . self::describeShape($node[$k], $depth + 1), $keys)) . (count($node) > 12 ? ', …' : '') . '}';
     }
 }

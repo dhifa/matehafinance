@@ -464,7 +464,7 @@ class WhatsApp extends BaseApiController
             return $this->fail(502, 'groups-failed', 'Daftar grup gagal dimuat: ' . $res['message']);
         }
 
-        return $this->ok(WaGroupStore::saveGroups($res['groups'], (string) Auth::user()['username']));
+        return $this->ok(WaGroupStore::saveGroups($res['groups'], (string) Auth::user()['username']) + ['diagnostic' => $res['groups'] === [] ? $res['message'] : null]);
     }
 
     /** POST groups/send {groupId, message, event?, mode: send|test} — one group per request. */
