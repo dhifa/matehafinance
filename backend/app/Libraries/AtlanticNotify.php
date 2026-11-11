@@ -47,7 +47,8 @@ class AtlanticNotify
 
         return [
             'configured' => self::isConfigured($cfg),
-            'maskedKey'  => $cfg['apiKey'] !== '' ? Secrets::mask($cfg['apiKey']) : null,
+            // Only the last 4 characters ever leave the server
+            'maskedKey'  => $cfg['apiKey'] !== '' ? '••••' . substr($cfg['apiKey'], -4) : null,
             'deviceId'   => $cfg['deviceId'],
             'testNumber' => $cfg['testNumber'],
             'updatedAt'  => $cfg['updatedAt'],
@@ -153,5 +154,70 @@ class AtlanticNotify
         } catch (Throwable $e) {
             return ['ok' => false, 'message' => 'Gagal menghubungi Atlantic-Notify: ' . mb_substr($e->getMessage(), 0, 150)];
         }
+    }
+
+    /**
+     * Groups the sending number has joined (GET /groups?device_id=…).
+     *
+     * @return array{ok: bool, message: string, groups: list<array{id: string, name: string, size: int|null}>}
+     */
+    public static function listGroups(array $cfg): array
+    {
+        try {
+            ['status' => $status, 'body' => $body] = self::call($cfg, 'GET', '/groups?device_id=' . rawurlencode($cfg['deviceId']));
+            $ok = $status >= 200 && $status < 300 && ($body['success'] ?? true) !== false && ($body['status'] ?? '') !== 'error';
+            if (! $ok) {
+                return ['ok' => false, 'message' => self::failureReason($status, $body), 'groups' => []];
+            }
+
+            return ['ok' => true, 'message' => 'OK', 'groups' => self::parseGroups($body)];
+        } catch (Throwable $e) {
+            return ['ok' => false, 'message' => 'Gagal menghubungi Atlantic-Notify: ' . mb_substr($e->getMessage(), 0, 150), 'groups' => []];
+        }
+    }
+
+    /**
+     * Reads a group list from any response shape (the GET /groups response is
+     * not documented): data / data.groups / groups, id / jid / group_id (maybe
+     * {_serialized}), name / subject. Only WhatsApp group ids (…@g.us) are kept.
+     *
+     * @return list<array{id: string, name: string, size: int|null}>
+     */
+    public static function parseGroups(mixed $body): array
+    {
+        $list = [];
+        foreach ([$body['data']['groups'] ?? null, $body['data']['data'] ?? null, $body['groups'] ?? null, $body['data'] ?? null, $body['results'] ?? null, $body] as $cand) {
+            if (is_array($cand) && $cand !== [] && array_is_list($cand)) {
+                $list = $cand;
+                break;
+            }
+        }
+        $out = [];
+        foreach ($list as $g) {
+            if (! is_array($g)) {
+                continue;
+            }
+            $id = $g['id'] ?? $g['jid'] ?? $g['group_id'] ?? $g['groupId'] ?? $g['chat_id'] ?? '';
+            if (is_array($id)) {
+                $id = $id['_serialized'] ?? $id['id'] ?? '';
+            }
+            $id = trim((string) $id);
+            if ($id !== '' && ! str_contains($id, '@')) {
+                $id .= '@g.us';
+            }
+            if (! preg_match('/^[0-9-]+@g\.us$/', $id)) {
+                continue;
+            }
+            $name = trim((string) ($g['name'] ?? $g['subject'] ?? $g['title'] ?? $g['groupMetadata']['subject'] ?? ''));
+            $size = $g['size'] ?? $g['participants_count'] ?? $g['participantsCount'] ?? $g['member_count'] ?? null;
+            if ($size === null && isset($g['participants']) && is_array($g['participants'])) {
+                $size = count($g['participants']);
+            }
+            $out[$id] = ['id' => $id, 'name' => mb_substr($name !== '' ? $name : $id, 0, 120), 'size' => is_numeric($size) ? (int) $size : null];
+        }
+        $out = array_values($out);
+        usort($out, static fn ($a, $b) => strcasecmp($a['name'], $b['name']));
+
+        return $out;
     }
 }

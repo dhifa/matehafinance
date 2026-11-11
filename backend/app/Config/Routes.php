@@ -29,6 +29,10 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api', 'filter' => ['cors'
     $routes->get('wa/staff', 'WhatsApp::staff');
     $routes->post('wa/events/send', 'WhatsApp::eventSend');
     $routes->post('wa/broadcast/send', 'WhatsApp::broadcastSend');
+    $routes->get('wa/groups', 'WhatsApp::groups');
+    $routes->post('wa/groups/refresh', 'WhatsApp::groupsRefresh');
+    $routes->post('wa/groups/send', 'WhatsApp::groupSend');
+    $routes->get('wa/groups/history', 'WhatsApp::groupHistory');
 
     $routes->post('gemini/parse-rab', 'Gemini::parseRab');
     $routes->post('gemini/parse-receipt', 'Gemini::parseReceipt');

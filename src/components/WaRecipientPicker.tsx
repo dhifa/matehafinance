@@ -5,6 +5,7 @@ export interface WaStaffMember {
   uid: string;
   name: string;
   username?: string;
+  jobTitle?: string;
   role: string;
   active: boolean;
   hasPhone: boolean;

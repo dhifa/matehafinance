@@ -16,6 +16,7 @@ import {
   renderTemplate,
 } from "../utils/waTemplates";
 import { confirmDialog } from "../utils/notification";
+import WaGroupPanel from "./WaGroupPanel";
 
 const BATCH = 5;
 
@@ -26,6 +27,8 @@ const BATCH = 5;
 export default function EventBlastModal({ event, canSaveTemplates, onClose }: { event: EventProject; canSaveTemplates: boolean; onClose: () => void }) {
   const [staff, setStaff] = useState<StaffMember[] | null>(null);
   const [kind, setKind] = useState<EventBlastKind>("info");
+  // Groups are admin only (canSaveTemplates is true for admins)
+  const [mode, setMode] = useState<"person" | "group">("person");
   const [templates, setTemplates] = useState<Record<EventBlastKind, string>>(DEFAULT_EVENT_TEMPLATES);
   const [selected, setSelected] = useState<StaffMember[]>([]);
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
@@ -141,13 +144,33 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
             <h3 id="event-blast-title" className="text-sm font-bold text-white flex items-center gap-2">
               <Megaphone className="w-4 h-4 text-emerald-400" /> Blast WhatsApp ke Kru — {event.name}
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Setiap orang menerima pesan dengan namanya sendiri. Nomor diambil dari No. HP di Manajemen Staff.</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {mode === "group"
+                ? "Satu pesan info event ke grup WhatsApp kru, dikirim lewat nomor WhatsApp Mateha."
+                : "Setiap orang menerima pesan dengan namanya sendiri. Nomor diambil dari No. HP di Manajemen Staff."}
+            </p>
+            {canSaveTemplates && (
+              <div className="flex gap-1.5 mt-2.5" role="tablist" aria-label="Tujuan kiriman">
+                <button type="button" role="tab" aria-selected={mode === "person"} onClick={() => setMode("person")} disabled={busy === "send"} className={chip(mode === "person")}>
+                  Per orang
+                </button>
+                <button type="button" role="tab" aria-selected={mode === "group"} onClick={() => setMode("group")} disabled={busy === "send"} className={chip(mode === "group")}>
+                  Grup WhatsApp
+                </button>
+              </div>
+            )}
           </div>
           <button type="button" onClick={onClose} disabled={busy === "send"} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer disabled:opacity-40" aria-label="Tutup">
             <X className="w-4 h-4" />
           </button>
         </div>
 
+        {mode === "group" ? (
+          <div className="p-4 overflow-y-auto">
+            <WaGroupPanel event={event} staff={staff} />
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 overflow-y-auto">
           {/* Message */}
           <div className="space-y-2.5">
@@ -237,6 +260,8 @@ export default function EventBlastModal({ event, canSaveTemplates, onClose }: { 
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

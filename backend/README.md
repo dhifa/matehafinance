@@ -91,6 +91,14 @@ manual), lalu kirim. Template bisa diedit dengan variabel `{nama} {acara} {tangg
 cepat (Pengumuman, Rapat/Briefing, Pengingat Finance), penerima semua akun aktif / per peran (mis. hanya finance) /
 manual, kirim tes ke saya, status per orang, dan kirim ulang yang gagal. Tab ini selalu muncul untuk admin dan finance.
 
+**Grup WhatsApp** (tab di Blast WA ke Kru, khusus admin): satu pesan info event (tanpa emoji, format `*tebal*`,
+termasuk kru bertugas dan link reimburse) ke grup WhatsApp kru. **Muat daftar grup** memanggil
+`GET /groups?device_id=…`; server hanya mau mengirim ke ID grup (`…@g.us`) yang ada di daftar itu. Satu grup per
+permintaan, jeda 4 detik antar grup, dan batas 10 kiriman per menit di server. Slip gaji dan data pribadi tidak
+pernah dikirim ke grup. Data disimpan sebagai file di `writable/` (chmod 600, tanpa tabel database):
+`wa_groups.json` (daftar grup), `wa_group_history.json` (riwayat: waktu, admin, grup, acara, hasil; tanpa isi pesan),
+dan `wa_group_throttle.json` (batas per menit). Pastikan folder `writable/` bisa ditulis oleh PHP.
+
 Untuk pengujian, `WA_API_BASE_URL` bisa diarahkan ke server tiruan (default `https://atlantic-notify.com/api/v1`).
 
 Setelah update, jalankan `php spark migrate` (membuat tabel `wa_payslip_status`, `payslip_links`, `wa_logs`).

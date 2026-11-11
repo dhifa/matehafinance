@@ -124,3 +124,6 @@ _modules/*
 
 /results/
 /phpunit.xml
+
+# WhatsApp group cache / history / rate limit (server data)
+/writable/wa_group*

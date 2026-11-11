@@ -91,3 +91,66 @@ export function formatEventDates(dates: string[] | undefined, fallback = ""): st
 export function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (all, key: string) => (key in vars ? vars[key] : all));
 }
+
+const DAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
+/** "07:00" → "07.00 WIB"; other text is kept as typed. */
+export function formatCallTime(raw?: string): string {
+  const t = (raw || "").trim();
+  const m = /^(\d{1,2})[:.](\d{2})$/.exec(t);
+  return m ? `${m[1].padStart(2, "0")}.${m[2]} WIB` : t;
+}
+
+/** One date → "Jumat, 20 November 2026"; several → same as formatEventDates. */
+export function formatEventDatesLong(dates: string[] | undefined, fallback = ""): string {
+  const valid = (dates || []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (valid.length !== 1) return formatEventDates(dates, fallback);
+  const [y, m, d] = valid[0].split("-").map(Number);
+  return `${DAYS[new Date(y, m - 1, d).getDay()]}, ${formatEventDates(valid)}`;
+}
+
+export interface GroupMessageInput {
+  name: string;
+  dates?: string[];
+  date?: string;
+  callTime?: string;
+  location?: string;
+  mapsUrl?: string;
+  meetingPoint?: string;
+  picName?: string;
+  rundownUrl?: string;
+  reimburse?: string;
+  crewNotes?: string;
+  crew: string; // one "Nama, Peran" per line
+}
+
+/**
+ * Event info for a WhatsApp crew group: WhatsApp *bold*, no emoji, and no
+ * personal data (payslips only ever go to each person's own number).
+ */
+export function buildGroupMessage(e: GroupMessageInput): string {
+  const line = (label: string, value?: string) => (value && value.trim() && value.trim() !== "-" ? `${label}: ${value.trim()}` : null);
+  const crew = e.crew
+    .split("\n")
+    .map((l) => l.replace(/^[-•*\s]+/, "").trim())
+    .filter(Boolean)
+    .map((l) => `- ${l}`);
+  const blocks: (string | null)[][] = [
+    [`*INFO EVENT: ${e.name.trim() || "-"}*`],
+    [
+      line("Tanggal", formatEventDatesLong(e.dates, e.date)),
+      line("Call time", formatCallTime(e.callTime)),
+      line("Lokasi", e.location),
+      line("Maps lokasi", e.mapsUrl),
+      line("Titik kumpul", e.meetingPoint || DEFAULT_MEETING_POINT.replace(" — ", ", ")),
+      line("PIC", e.picName),
+    ],
+    crew.length ? ["*Kru bertugas:*", ...crew] : [],
+    [line("Rundown", e.rundownUrl), line("Input reimburse", e.reimburse), line("Catatan", e.crewNotes)],
+    ["Mohon konfirmasi kehadiran di grup ini. Terima kasih."],
+  ];
+  return blocks
+    .map((b) => b.filter(Boolean).join("\n"))
+    .filter(Boolean)
+    .join("\n\n");
+}

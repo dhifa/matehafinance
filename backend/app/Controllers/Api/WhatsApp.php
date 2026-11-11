@@ -6,6 +6,7 @@ use App\Libraries\AtlanticNotify;
 use App\Libraries\Auth;
 use App\Libraries\DocumentStore;
 use App\Libraries\Secrets;
+use App\Libraries\WaGroupStore;
 use CodeIgniter\HTTP\ResponseInterface;
 
 /**
@@ -251,6 +252,7 @@ class WhatsApp extends BaseApiController
                 'name'     => (string) (($u['displayName'] ?? '') ?: ($u['username'] ?? $doc['id'])),
                 'username' => (string) ($u['username'] ?? ''),
                 'role'     => strtolower((string) ($u['role'] ?? 'staff')),
+                'jobTitle' => (string) ($u['jobTitle'] ?? ''),
                 'active'   => ($u['status'] ?? '') !== 'nonaktif',
                 'hasPhone' => $phone !== '',
                 'phone'    => AtlanticNotify::maskPhone($phone),
@@ -429,6 +431,96 @@ class WhatsApp extends BaseApiController
         }
 
         return $this->ok(['results' => $results]);
+    }
+
+    // ------------------------------------------------------------------
+    // WhatsApp groups (admin): event info to crew groups. Only group ids from
+    // the cached GET /groups list are accepted; payslips and personal data
+    // never go here. Cache, history and rate limit live in writable/ files.
+    // ------------------------------------------------------------------
+
+    /** GET groups — the cached list. */
+    public function groups(): ResponseInterface
+    {
+        if (! Auth::isAdmin()) {
+            return $this->denied();
+        }
+
+        return $this->ok(WaGroupStore::groups());
+    }
+
+    /** POST groups/refresh — asks Atlantic-Notify for the groups and caches them. */
+    public function groupsRefresh(): ResponseInterface
+    {
+        if (! Auth::isAdmin()) {
+            return $this->denied();
+        }
+        $cfg = AtlanticNotify::config();
+        if (! AtlanticNotify::isConfigured($cfg)) {
+            return $this->notConfigured();
+        }
+        $res = AtlanticNotify::listGroups($cfg);
+        if (! $res['ok']) {
+            return $this->fail(502, 'groups-failed', 'Daftar grup gagal dimuat: ' . $res['message']);
+        }
+
+        return $this->ok(WaGroupStore::saveGroups($res['groups'], (string) Auth::user()['username']));
+    }
+
+    /** POST groups/send {groupId, message, event?, mode: send|test} — one group per request. */
+    public function groupSend(): ResponseInterface
+    {
+        if (! Auth::isAdmin()) {
+            return $this->denied();
+        }
+        $body    = $this->body();
+        $message = trim((string) ($body['message'] ?? ''));
+        $mode    = (string) ($body['mode'] ?? 'send');
+        $event   = mb_substr(trim((string) preg_replace('/\s+/', ' ', (string) ($body['event'] ?? ''))), 0, 120) ?: '-';
+        if ($message === '' || mb_strlen($message) > 3000) {
+            return $this->fail(400, 'invalid-argument', 'Isi pesan kosong atau terlalu panjang (maks. 3000 karakter).');
+        }
+        $cfg = AtlanticNotify::config();
+        if (! AtlanticNotify::isConfigured($cfg)) {
+            return $this->notConfigured();
+        }
+
+        if ($mode === 'test') {
+            if ($cfg['testNumber'] === '') {
+                return $this->fail(400, 'failed-precondition', 'Isi Nomor Tes di Pengaturan WhatsApp terlebih dahulu.');
+            }
+            $target = ['id' => $cfg['testNumber'], 'name' => 'Tes ke ' . AtlanticNotify::maskPhone($cfg['testNumber'])];
+        } else {
+            $target = WaGroupStore::findGroup((string) ($body['groupId'] ?? ''));
+            if ($target === null) {
+                return $this->fail(400, 'invalid-argument', 'Grup tidak ada di daftar. Klik Muat daftar grup lalu pilih lagi.');
+            }
+        }
+
+        $wait = WaGroupStore::takeSlot();
+        if ($wait > 0) {
+            return $this->fail(429, 'rate-limited', 'Batas ' . WaGroupStore::LIMIT_PER_MINUTE . " kiriman per menit tercapai. Coba lagi dalam {$wait} detik.");
+        }
+
+        $sent = AtlanticNotify::sendText($cfg, $target['id'], $mode === 'test' ? "*PESAN TES*\n\n" . $message : $message);
+        WaGroupStore::addHistory([
+            'by' => (string) Auth::user()['username'], 'group' => $target['name'], 'event' => $event,
+            'ok' => $sent['ok'], 'reason' => $sent['reason'] ?? null, 'test' => $mode === 'test',
+        ]);
+
+        return $this->ok($sent['ok']
+            ? ['ok' => true, 'message' => $mode === 'test' ? 'Pesan tes terkirim ke ' . AtlanticNotify::maskPhone($cfg['testNumber']) . '.' : 'Terkirim ke ' . $target['name'] . '.']
+            : ['ok' => false, 'message' => $sent['reason'] ?? 'Gagal mengirim.']);
+    }
+
+    /** GET groups/history — last group sends (no message bodies). */
+    public function groupHistory(): ResponseInterface
+    {
+        if (! Auth::isAdmin()) {
+            return $this->denied();
+        }
+
+        return $this->ok(['history' => WaGroupStore::history()]);
     }
 
     // ------------------------------------------------------------------
