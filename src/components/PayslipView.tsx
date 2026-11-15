@@ -52,7 +52,8 @@ import PayslipWaModal from "./PayslipWaModal";
 import ttd from "../../assets/ttd.png";
 import { formatMultiDates, parseIndonesianDateText } from "../utils/date";
 import { saveAs } from "file-saver";
-import { generateStaffPayslipPdfBlob, printStaffPayslipDirectly, StaffPayslipPdfData } from "../utils/pdfGenerator";
+import { buildStaffPayslipHtml, generateStaffPayslipPdfBlob, printStaffPayslipDirectly, StaffPayslipPdfData } from "../utils/pdfGenerator";
+import PayslipPreviewModal from "./PayslipPreviewModal";
 import { confirmDialog } from "../utils/notification";
 
 interface PayslipViewProps {
@@ -104,6 +105,9 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
   const [isSavingModal, setIsSavingModal] = useState(false);
   const [adminExportingStaffPdf, setAdminExportingStaffPdf] = useState(false);
   const [adminPrintingStaff, setAdminPrintingStaff] = useState(false);
+  // On-screen payslip preview: undefined = closed, null = preparing
+  const [previewHtml, setPreviewHtml] = useState<string | null | undefined>(undefined);
+  const [previewTitle, setPreviewTitle] = useState("");
 
   // Kasbon requests subscription & state
   const [kasbonList, setKasbonList] = useState<KasbonRequest[]>([]);
@@ -769,6 +773,19 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
       onNotify("Gagal mengunduh PDF: " + err.message, "error");
     } finally {
       setAdminExportingStaffPdf(false);
+    }
+  };
+
+  const handleAdminPreviewStaff = async () => {
+    const data = buildModalStaffPdfData();
+    if (!data) return;
+    setPreviewTitle(`Slip Gaji ${data.staffDisplayName || data.staffUsername} — ${data.monthName} ${data.year}`);
+    setPreviewHtml(null);
+    try {
+      setPreviewHtml(await buildStaffPayslipHtml(data));
+    } catch (err: any) {
+      setPreviewHtml(undefined);
+      onNotify("Gagal menampilkan slip: " + err.message, "error");
     }
   };
 
@@ -1842,6 +1859,16 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
 
                 <button
                   type="button"
+                  onClick={handleAdminPreviewStaff}
+                  className="flex items-center space-x-1.5 px-3.5 py-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-500/40 rounded-xl text-xs font-bold transition cursor-pointer"
+                  title="Lihat slip gaji staf ini tanpa mengunduh"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Lihat Slip</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleAdminDownloadStaffPdf}
                   disabled={adminExportingStaffPdf}
                   className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50"
@@ -1875,6 +1902,18 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
             </div>
           </div>
         </div>
+      )}
+
+      {previewHtml !== undefined && (
+        <PayslipPreviewModal
+          title={previewTitle}
+          html={previewHtml}
+          onClose={() => setPreviewHtml(undefined)}
+          onDownload={handleAdminDownloadStaffPdf}
+          onPrint={handleAdminPrintStaff}
+          downloading={adminExportingStaffPdf}
+          printing={adminPrintingStaff}
+        />
       )}
     </div>
   );
