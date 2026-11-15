@@ -1848,6 +1848,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                       <th className="py-3 px-4">Nama Event / Projek</th>
                       <th className="py-3 px-4">Tanggal & Lokasi</th>
                       <th className="py-3 px-4 text-right">Omset</th>
+                      <th className="py-3 px-4 text-right" title="Total B. Akomodasi pada realisasi (Point B)">Akomodasi Point B</th>
                       <th className="py-3 px-4 text-right">Profit Event</th>
                       <th className="py-3 px-4 text-center font-mono">Status Pembayaran</th>
                       <th className="py-3 px-4 text-center">Status Keuangan</th>
@@ -1860,7 +1861,7 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                     {Object.entries(groupedProjects).map(([monthYear, group]: [string, EventProject[]]) => (
                       <React.Fragment key={monthYear}>
                         <tr className="bg-slate-950/40 text-cyan-500 text-[10px] font-mono font-bold uppercase tracking-wider">
-                          <td colSpan={7} className="py-2 px-4 border-b border-slate-800/60">
+                          <td colSpan={8} className="py-2 px-4 border-b border-slate-800/60">
                              {monthYear}
                           </td>
                         </tr>
@@ -1888,6 +1889,9 @@ _Sistem Keuangan Otomatis Mateha Production_`;
                               </td>
                               <td className="py-3.5 px-4 text-right font-mono text-slate-400">
                                 {formatRupiah(realCalc.totalIncome)}
+                              </td>
+                              <td className="py-3.5 px-4 text-right font-mono text-amber-300/90">
+                                {formatRupiah(realCalc.totalAccommodation)}
                               </td>
                               <td className="py-3.5 px-4 text-right font-mono text-cyan-400 font-bold">
                                 {formatRupiah(realCalc.matehaProfit)}
