@@ -100,6 +100,8 @@ export interface Invoice extends DocumentDiscount {
   dueDate: string;
   items: InvoiceItem[];
   grandTotal: number;
+  // Contract total typed by hand (after any discount); replaces the computed total
+  totalOverride?: number;
   status: "draft" | "sent" | "paid";
   createdAt: string;
   selectedBanks: Bank[];

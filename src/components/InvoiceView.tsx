@@ -60,6 +60,10 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [discountType, setDiscountType] = useState<DiscountType | "none">("none");
   const [discountValue, setDiscountValue] = useState(0);
+  // Contract total typed by hand (null = computed from the items and discount)
+  const [totalOverride, setTotalOverride] = useState<number | null>(null);
+  const [editingTotal, setEditingTotal] = useState(false);
+  const [totalDraft, setTotalDraft] = useState("");
   const [termsAndConditions, setTermsAndConditions] = useState("Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
   const [saveToClientDb, setSaveToClientDb] = useState(false);
 
@@ -230,6 +234,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     setItems(inv.items ? JSON.parse(JSON.stringify(inv.items)) : []);
     setDiscountType(inv.discountType || "none");
     setDiscountValue(inv.discountValue || 0);
+    setTotalOverride(inv.totalOverride ?? null);
+    setEditingTotal(false);
     setSelectedBankIds(inv.selectedBanks ? inv.selectedBanks.map(b => b.id) : []);
     setTermsAndConditions(inv.termsAndConditions || "Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.");
     setShowClientApproval(!!inv.showClientApproval);
@@ -254,6 +260,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     setItems([]);
     setDiscountType("none");
     setDiscountValue(0);
+    setTotalOverride(null);
+    setEditingTotal(false);
     setDate(new Date().toISOString().split("T")[0]);
     setDueDate("");
     setSelectedBankIds(banks.filter(b => b.isDefault).map(b => b.id));
@@ -293,8 +301,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
     const selectedBanks = banks.filter(b => selectedBankIds.includes(b.id));
     const itemsSubtotal = sanitizedItems.reduce((sum, item) => sum + item.total, 0);
     const discount = discountFields(itemsSubtotal, discountType, discountValue);
-    // Contract value after the discount; DP and remaining amounts are based on it
-    const subtotalItems = itemsSubtotal - (discount.discountAmount || 0);
+    // Contract value after the discount (or the hand-typed total); DP and remaining amounts are based on it
+    const subtotalItems = totalOverride ?? itemsSubtotal - (discount.discountAmount || 0);
 
     const finalIsDp = !!isDp;
     let finalGrandTotal = subtotalItems;
@@ -336,6 +344,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
           items: sanitizedItems,
           ...discount,
           grandTotal: finalGrandTotal,
+          totalOverride: totalOverride ?? undefined,
           status: existingInv?.status || "draft",
           createdAt: existingInv?.createdAt || new Date().toISOString(),
           selectedBanks: finalBanks,
@@ -400,6 +409,7 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
           items: sanitizedItems,
           ...discount,
           grandTotal: finalGrandTotal,
+          totalOverride: totalOverride ?? undefined,
           status: "draft",
           createdAt: new Date().toISOString(),
           selectedBanks,
@@ -450,6 +460,8 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
         setItems([]);
     setDiscountType("none");
     setDiscountValue(0);
+    setTotalOverride(null);
+    setEditingTotal(false);
         setDate(new Date().toISOString().split("T")[0]);
         setDueDate("");
         setSelectedBankIds(banks.filter(b => b.isDefault).map(b => b.id));
@@ -484,8 +496,14 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
 
   const itemsSubtotal = items.reduce((sum, item) => sum + item.total, 0);
   const discountAmountNow = computeDiscount(itemsSubtotal, discountType, discountValue);
-  // Contract value after the discount (DP is calculated from this)
-  const grandTotalAll = itemsSubtotal - discountAmountNow;
+  // Contract value after the discount (DP is calculated from this); a hand-typed total replaces it
+  const computedTotal = itemsSubtotal - discountAmountNow;
+  const grandTotalAll = totalOverride ?? computedTotal;
+  const applyTotalDraft = () => {
+    const value = Math.round(Number(totalDraft.replace(/\D/g, "")) || 0);
+    setTotalOverride(totalDraft.trim() === "" || value === computedTotal ? null : value);
+    setEditingTotal(false);
+  };
 
   return (
     <div className="text-white space-y-6">
@@ -988,9 +1006,55 @@ export default function InvoiceView({ onNotify }: InvoiceViewProps = {}) {
                   )}
                 </div>
                 <div className="text-left sm:text-right">
+                  {editingTotal ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-400 font-mono">{isDp ? "Total kontrak Rp" : "Rp"}</span>
+                      <input
+                        autoFocus
+                        inputMode="numeric"
+                        value={totalDraft}
+                        onChange={(e) => setTotalDraft(e.target.value.replace(/[^\d.]/g, ""))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") applyTotalDraft();
+                          if (e.key === "Escape") setEditingTotal(false);
+                        }}
+                        aria-label="Total tagihan"
+                        className="w-36 bg-slate-950 border border-blue-500/60 rounded-lg px-2 py-1 text-sm font-mono font-bold text-blue-300 text-right focus:outline-none"
+                      />
+                      <button type="button" onClick={applyTotalDraft} className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white cursor-pointer" title="Simpan total" aria-label="Simpan total">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button type="button" onClick={() => setEditingTotal(false)} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer" title="Batal" aria-label="Batal ubah total">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                  <div className="flex items-center gap-2 sm:justify-end">
                   <span className="text-base font-extrabold text-blue-400 font-mono">
                     {formatRupiah(isDp ? (dpMode === "percentage" ? Math.round((grandTotalAll * (dpPercent || 50)) / 100) : Math.min(grandTotalAll, dpAmountManual || 0)) : grandTotalAll)}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTotalDraft(String(grandTotalAll));
+                      setEditingTotal(true);
+                    }}
+                    className="p-1 rounded-md text-slate-400 hover:text-blue-300 hover:bg-slate-800 cursor-pointer"
+                    title={isDp ? "Ubah total nilai kontrak" : "Ubah total tagihan"}
+                    aria-label={isDp ? "Ubah total nilai kontrak" : "Ubah total tagihan"}
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                  </div>
+                  )}
+                  {totalOverride !== null && !editingTotal && (
+                    <p className="text-[10px] text-amber-300/90 font-mono">
+                      Total diubah manual • hitungan item: {formatRupiah(computedTotal)}{" "}
+                      <button type="button" onClick={() => setTotalOverride(null)} className="underline hover:text-amber-200 cursor-pointer">
+                        Kembalikan otomatis
+                      </button>
+                    </p>
+                  )}
                   {isDp && (
                     <p className="text-[10px] text-slate-400 font-mono">
                       Total Kontrak: {formatRupiah(grandTotalAll)} • Sisa: {formatRupiah(Math.max(0, grandTotalAll - (dpMode === "percentage" ? Math.round((grandTotalAll * (dpPercent || 50)) / 100) : Math.min(grandTotalAll, dpAmountManual || 0))))}

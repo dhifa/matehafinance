@@ -28,7 +28,7 @@ export const INVOICE_DEFAULT_TERMS = ["Bukti transfer mohon dikirimkan ke admin 
 
 export function getInvoiceTotals(invoice: Invoice) {
   const itemsSubtotal = invoice.subtotal ?? invoice.items.reduce((s, itm) => s + itm.total, 0);
-  const contractTotal = invoice.totalAmount || itemsSubtotal - (invoice.discountAmount || 0);
+  const contractTotal = invoice.totalAmount || invoice.totalOverride || itemsSubtotal - (invoice.discountAmount || 0);
   const remaining = invoice.remainingAmount ?? Math.max(0, contractTotal - invoice.grandTotal);
   return { contractTotal, remaining };
 }
@@ -84,8 +84,10 @@ export default function InvoiceDocument({
     </>
   );
 
-  // Shown only when the invoice has a discount: items subtotal, then the discount
-  const discountLines: TotalLine[] = invoice.discountAmount
+  // Shown only when the invoice has a discount: items subtotal, then the discount.
+  // A hand-typed total is shown on its own, without subtotal or discount lines.
+  const hasOverride = invoice.totalOverride != null;
+  const discountLines: TotalLine[] = invoice.discountAmount && !hasOverride
     ? [
         { label: "Subtotal", value: formatRupiah(contractTotal + invoice.discountAmount) },
         { label: discountLabel(invoice), value: `−${formatRupiah(invoice.discountAmount)}`, variant: "muted" },
@@ -101,7 +103,7 @@ export default function InvoiceDocument({
         { label: "Sisa tagihan (pelunasan)", value: formatRupiah(remaining), variant: "muted" },
       ]
     : [
-        ...(discountLines.length ? discountLines : [{ label: "Subtotal", value: formatRupiah(invoice.grandTotal) }]),
+        ...(discountLines.length ? discountLines : hasOverride ? [] : [{ label: "Subtotal", value: formatRupiah(invoice.grandTotal) }]),
         { label: "Total Tagihan", value: formatRupiah(invoice.grandTotal), variant: "grand" },
       ];
 

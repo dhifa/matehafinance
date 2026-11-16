@@ -67,7 +67,7 @@ export default function InvoicePreview({
       `Ditagihkan Kepada: *${invoice.customerName}* ${invoice.customerContact ? `(PIC: ${invoice.customerContact})` : ''}\n` +
       `Perihal: *${invoice.subject || 'Tagihan Layanan Event'}*\n\n` +
       `*Rincian Tagihan:*\n${itemsText}\n\n` +
-      (invoice.discountAmount
+      (invoice.discountAmount && invoice.totalOverride == null
         ? `Subtotal: ${formatRupiah((invoice.subtotal ?? invoice.grandTotal + invoice.discountAmount))}\n` +
           `${discountLabel(invoice)}: -${formatRupiah(invoice.discountAmount)}\n`
         : '') +
