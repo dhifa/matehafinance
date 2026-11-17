@@ -45,7 +45,7 @@ export const COMPANY = {
   tagline: "Event Production & Multimedia Specialist",
   addressLine1: "Komplek BTN No.6A, Sekejati, Kec. Buahbatu",
   addressLine2: "Kota Bandung, Jawa Barat 40286",
-  phone: "+62 811-1244-7701",
+  phone: "+62 811-2447-701", // WhatsApp 628112447701
   email: "matehaproduction@gmail.com",
   city: "Bandung",
   signerName: "Dhifa Aksa Hermawan",

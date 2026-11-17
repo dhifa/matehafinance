@@ -8,6 +8,7 @@ import { terbilang } from "../utils/numberToWords";
 import { Download, Printer, FileText, Loader2, UserCheck, Trash2, MessageCircle } from "lucide-react";
 import InvoiceDocument from "./documents/InvoiceDocument";
 import SendWhatsAppModal from "./documents/SendWhatsAppModal";
+import { COMPANY } from "./documents/docTheme";
 import DocumentPreviewShell, { primaryToolbarButton, toolbarButton } from "./documents/DocumentPreviewShell";
 import { itemSummaryText } from "../utils/lineItems";
 import { discountLabel } from "../utils/discount";
@@ -75,7 +76,7 @@ export default function InvoicePreview({
       `_(Terbilang: ${terbilangText})_\n` +
       `${bankText}\n\n` +
       `*Syarat & Ketentuan Pembayaran:*\n${invoice.termsAndConditions || 'Pelunasan invoice wajib dibayarkan selambat-lambatnya pada hari H acara.'}\n\n` +
-      `Terima kasih,\n*Mateha Production* (Hotline: +62 811-1244-7701)`;
+      `Terima kasih,\n*Mateha Production* (Hotline: ${COMPANY.phone})`;
 
     return text;
   };

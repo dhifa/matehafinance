@@ -8,6 +8,7 @@ import { generateKwitansiItemPdfBlob, pdfFileName, printPdfBlob } from "../utils
 import { notify } from "../utils/notification";
 import KwitansiDocument, { kwitansiFromInvoice } from "./documents/KwitansiDocument";
 import SendWhatsAppModal from "./documents/SendWhatsAppModal";
+import { COMPANY } from "./documents/docTheme";
 import DocumentPreviewShell, { primaryToolbarButton, toolbarButton } from "./documents/DocumentPreviewShell";
 
 interface KwitansiPreviewProps {
@@ -50,7 +51,7 @@ export default function KwitansiPreview({ kwitansi, invoice, onClose }: Kwitansi
     (data.invoiceNumber ? `Referensi invoice: ${data.invoiceNumber}\n` : "") +
     (data.paymentMethod ? `Metode: ${data.paymentMethod}\n` : "") +
     `\nPembayaran telah kami terima dengan baik. Terima kasih atas kepercayaan Anda.\n` +
-    `*Mateha Production* (Hotline: +62 811-1244-7701)`;
+    `*Mateha Production* (Hotline: ${COMPANY.phone})`;
 
   return (
     <>
