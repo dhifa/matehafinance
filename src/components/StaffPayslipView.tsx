@@ -490,7 +490,9 @@ export default function StaffPayslipView({
   const payslipKey = `${staffUsername}-${selectedYear}-${selectedMonth}`;
   const rawSavedPayslip = publishedPayslips[payslipKey] || null;
   const isPayslipPublished = !!(rawSavedPayslip && rawSavedPayslip.published);
-  const savedPayslip = isPayslipPublished ? rawSavedPayslip : null;
+  // Admin additions and deductions show up right away, also while the payslip is still a draft
+  // (the page then labels it as an estimate); releasing it only unlocks the official PDF.
+  const savedPayslip = rawSavedPayslip;
 
   // Final Earnings combination
   const finalEarnings = useMemo(() => {
