@@ -965,8 +965,8 @@ export default function PayslipView({ projects, currentUserProfile, onNotify }: 
               <p className="text-base sm:text-lg font-mono font-black text-white">
                 {formatRupiah(periodKpiSummary.totalTakeHome)}
               </p>
-              <span className="text-[9px] text-slate-400 font-sans block">
-                Periode: {INDONESIAN_MONTH_NAMES[selectedMonth]} {selectedYear}
+              <span className="text-[9px] text-slate-400 font-sans block" title="THP = pendapatan kotor (honor + driver + reimburse + penambahan) − kasbon ACC − potongan manual">
+                Sudah dipotong kasbon &amp; potongan • Kotor {formatRupiah(periodKpiSummary.totalGross)}
               </span>
             </div>
 
