@@ -579,6 +579,17 @@ export default function StaffPayslipView({
   const kasbonFixedLimit = currentUserProfile.kasbonFixedLimit || 0;
   const totalGrossTHP = totalEarnings; // Total THP sebelum kasbon (Gaji/Honor + Reimbursement + Tambahan)
 
+  // Manual deductions (sanksi/potongan) the admin already put on this period's payslip, even while it is
+  // still a draft: they come out of the same pay, so they reduce what can be borrowed. Kasbon lines the
+  // admin typed in by hand are left out, since active kasbon is already counted separately.
+  const manualDeductionsForLimit = useMemo(
+    () =>
+      (rawSavedPayslip?.customDeductions || [])
+        .filter((d) => !/kasbon/i.test(d.description || ""))
+        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0),
+    [rawSavedPayslip]
+  );
+
   // Maximum kasbon that can be requested based on policy
   const maxAllowedKasbon = useMemo(() => {
     if (kasbonPlafondType === "unlimited") {
@@ -588,12 +599,12 @@ export default function StaffPayslipView({
       return Math.max(0, kasbonFixedLimit - currentPeriodActiveKasbon);
     }
     if (kasbonPlafondType === "auto") {
-      return Math.max(0, feeOnlyEarnings - currentPeriodActiveKasbon);
+      return Math.max(0, feeOnlyEarnings - manualDeductionsForLimit - currentPeriodActiveKasbon);
     }
-    // Default "percent": % of Gross THP (Gaji + Reimbursement)
-    const percentQuota = Math.floor(totalGrossTHP * (kasbonPercentLimit / 100));
+    // Default "percent": % of Gross THP (Gaji + Reimbursement) after manual deductions
+    const percentQuota = Math.floor(Math.max(0, totalGrossTHP - manualDeductionsForLimit) * (kasbonPercentLimit / 100));
     return Math.max(0, percentQuota - currentPeriodActiveKasbon);
-  }, [kasbonPlafondType, kasbonFixedLimit, kasbonPercentLimit, totalGrossTHP, feeOnlyEarnings, currentPeriodActiveKasbon]);
+  }, [kasbonPlafondType, kasbonFixedLimit, kasbonPercentLimit, totalGrossTHP, feeOnlyEarnings, currentPeriodActiveKasbon, manualDeductionsForLimit]);
 
   // Handle staff submitting kasbon request with constraint check
   const [submittingSalary, setSubmittingSalary] = useState(false);
@@ -2100,7 +2111,8 @@ export default function StaffPayslipView({
                         <span className="text-[10px] text-slate-400 uppercase font-mono block">Sisa Plafon Kasbon Tersedia:</span>
                         <span className="text-sm font-mono font-extrabold text-emerald-400">{formatRupiah(maxAllowedKasbon)}</span>
                         <span className="text-[9.5px] text-slate-400 block mt-0.5">
-                          Basis Honor Event: {formatRupiah(feeOnlyEarnings)} (Terpakai: {formatRupiah(currentPeriodActiveKasbon)})
+                          Basis Honor Event: {formatRupiah(feeOnlyEarnings)}
+                          {manualDeductionsForLimit > 0 && <> − Potongan: {formatRupiah(manualDeductionsForLimit)}</>} (Terpakai: {formatRupiah(currentPeriodActiveKasbon)})
                         </span>
                       </div>
                       <button
@@ -2144,7 +2156,8 @@ export default function StaffPayslipView({
                       </div>
                       <span className="text-sm font-mono font-extrabold text-amber-300">{formatRupiah(maxAllowedKasbon)}</span>
                       <span className="text-[9.5px] text-slate-400 block mt-0.5">
-                        Total THP Bruto: {formatRupiah(totalGrossTHP)} &bull; Kuota {kasbonPercentLimit}%: {formatRupiah(Math.floor(totalGrossTHP * (kasbonPercentLimit / 100)))} &bull; Terpakai: {formatRupiah(currentPeriodActiveKasbon)}
+                        Total THP Bruto: {formatRupiah(totalGrossTHP)}
+                        {manualDeductionsForLimit > 0 && <> &bull; Potongan: {formatRupiah(manualDeductionsForLimit)}</>} &bull; Kuota {kasbonPercentLimit}%: {formatRupiah(Math.floor(Math.max(0, totalGrossTHP - manualDeductionsForLimit) * (kasbonPercentLimit / 100)))} &bull; Terpakai: {formatRupiah(currentPeriodActiveKasbon)}
                       </span>
                     </div>
                     <button
